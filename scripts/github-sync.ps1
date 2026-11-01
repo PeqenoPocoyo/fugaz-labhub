@@ -1,89 +1,59 @@
-<#
-.SYNOPSIS
-    Sincroniza o FUGAZ LABHUB com o GitHub (commit + push) em um comando.
+# Sincroniza o FUGAZ LABHUB com o GitHub (commit + push) em um comando.
+# Publica em https://github.com/PeqenoPocoyo/fugaz-labhub
+#
+# Uso:
+#   .\scripts\github-sync.ps1 "feat: minha mensagem"
+#   .\scripts\github-sync.ps1                 (mensagem automatica com timestamp)
+#   git sync "mensagem"                      (atalho configurado no repo)
 
-.DESCRIPTION
-    Publica o estado atual do projeto em github.com/PeqenoPocoyo/fugaz-labhub.
-    Ignora automaticamente node_modules, dist, caches e segredos (via .gitignore).
-
-.PARAMETER Message
-    Mensagem do commit. Se omitida, gera uma mensagem com timestamp.
-
-.PARAMETER Watch
-    Modo vigia: refaz o sync a cada N segundos enquanto houver mudanças.
-
-.PARAMETER Interval
-    Intervalo do modo vigia em segundos (padrão: 60).
-
-.EXAMPLE
-    .\scripts\github-sync.ps1
-    .\scripts\github-sync.ps1 -Message "feat: engrenagens com razão computada"
-    .\scripts\github-sync.ps1 -Watch -Interval 30
-#>
-param(
-    [string]$Message = "",
-    [switch]$Watch = $false,
-    [int]$Interval = 60
-)
+param([string]$Message = "")
 
 $ErrorActionPreference = "Stop"
-$repo = "C:\Users\drici\Documents\FUGAZ LABHUB"
-$remote = "https://github.com/PeqenoPocoyo/fugaz-labhub.git"
+$repoRoot = "C:\Users\drici\Documents\FUGAZ LABHUB"
+$remoteUrl = "https://github.com/PeqenoPocoyo/fugaz-labhub.git"
 
-function Test-GitRepo {
-    git -C $repo rev-parse --git-dir *> $null
-    return $?
+# ---------- bootstrap: repo + remote ----------
+$isRepo = git -C $repoRoot rev-parse --git-dir 2>$null
+if (-not $isRepo) {
+    Write-Host "[setup] inicializando repositorio git..." -ForegroundColor Cyan
+    git -C $repoRoot init -b main
 }
 
-# ---------- Bootstrap: garante repo + remote na primeira execução ----------
-if (-not (Test-GitRepo)) {
-    Write-Host "[setup] Inicializando repositório git..." -ForegroundColor Cyan
-    git -C $repo init -b main
+$hasRemote = git -C $repoRoot remote
+if ($hasRemote -notmatch "origin") {
+    Write-Host "[setup] adicionando remote origin..." -ForegroundColor Cyan
+    git -C $repoRoot remote add origin $remoteUrl
 }
 
-if (-not (git -C $repo remote | Select-String -SimpleMatch "origin")) {
-    Write-Host "[setup] Adicionando remote origin..." -ForegroundColor Cyan
-    git -C $repo remote add origin $remote
-}
-
-# ---------- Um ciclo de sync ----------
-function Invoke-Sync {
-    $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $msg = if ($Message) { $Message } else { "chore: sync $stamp" }
-
-    # Nada a fazer?
-    $status = git -C $repo status --porcelain
-    if (-not $status) {
-        Write-Host "[sync] Nada a publicar ($stamp)" -ForegroundColor DarkGray
-        return
-    }
-
-    git -C $repo add -A
-    git -C $repo commit -m $msg *> $null
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[erro] falha no commit" -ForegroundColor Red
-        return
-    }
-
-    $files = ($status | Measure-Object).Count
-    Write-Host "[sync] $files arquivo(s) — '$msg'" -ForegroundColor Green
-
-    git -C $repo push origin HEAD *> $null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "[sync] publicado em $remote" -ForegroundColor Green
-    } else {
-        Write-Host "[erro] push falhou — verifique credenciais/conexão" -ForegroundColor Red
-    }
-}
-
-# ---------- Execução ----------
-if ($Watch) {
-    Write-Host "[watch] vigiando mudanças a cada ${Interval}s (Ctrl+C para sair)" -ForegroundColor Cyan
-    while ($true) {
-        Invoke-Sync
-        Start-Sleep -Seconds $Interval
-    }
+# ---------- ciclo de sync ----------
+$stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+if ($Message -ne "") {
+    $msg = $Message
 } else {
-    Invoke-Sync
+    $msg = "chore: sync $stamp"
 }
+
+$changes = git -C $repoRoot status --porcelain
+if (-not $changes) {
+    Write-Host "[sync] nada a publicar ($stamp)" -ForegroundColor DarkGray
+    exit 0
+}
+
+$count = ($changes | Measure-Object).Count
+git -C $repoRoot add -A
+git -C $repoRoot commit -m $msg | Out-Null
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[erro] falha no commit" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "[sync] $count arquivo(s) - $msg" -ForegroundColor Green
+
+git -C $repoRoot push origin HEAD | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[erro] push falhou (credenciais/conexao)" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "[sync] publicado em github.com/PeqenoPocoyo/fugaz-labhub" -ForegroundColor Green
