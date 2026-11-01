@@ -45,23 +45,52 @@ export const FrameController: React.FC<FrameProps> = ({ objects, selecionado }) 
         box.expandByPoint(new THREE.Vector3(o.position[0] + m, o.position[1] + m, o.position[2] + m))
       }
       const centro = box.getCenter(new THREE.Vector3())
-      const raio = Math.max(alvo === 'selecionado' ? 0.55 : 0.8, box.getSize(new THREE.Vector3()).length() / 2)
-
-      // distância para caber no FOV (com folga de 15%)
-      const fov = THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov)
-      const aspect = gl.domElement.clientWidth / Math.max(1, gl.domElement.clientHeight)
-      const fovH = 2 * Math.atan(Math.tan(fov / 2) * aspect)
-      const dist = (raio * 1.15) / Math.sin(Math.min(fov, fovH) / 2)
+      const tamanho = box.getSize(new THREE.Vector3())
+      const raio = Math.max(alvo === 'selecionado' ? 0.35 : 0.5, tamanho.length() / 2)
 
       // direção atual preservada (não "reseta" o ângulo do usuário)
       const dir = camera.position.clone().sub(controls?.target ?? new THREE.Vector3())
       if (dir.lengthSq() < 1e-6) dir.set(1, 0.8, 1)
       dir.normalize()
 
+      // base ortonormal da câmera nessa direção (dir, right, up)
+      const fwd = dir.clone()
+      const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize()
+      const up = new THREE.Vector3().crossVectors(right, fwd).normalize()
+
+      // distância EXATA para caber a caixa: para cada canto, a distância
+      // necessária para que ele caiba no FOV vertical e horizontal.
+      // (usar o raio da esfera superestimava muito e deixava "afastado")
+      const fovV = THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov)
+      const aspect = gl.domElement.clientWidth / Math.max(1, gl.domElement.clientHeight)
+      const tanV = Math.tan(fovV / 2)
+      const tanH = tanV * aspect
+
+      let dist = 0.1
+      for (const corner of [
+        new THREE.Vector3(tamanho.x / 2, tamanho.y / 2, tamanho.z / 2),
+        new THREE.Vector3(-tamanho.x / 2, tamanho.y / 2, -tamanho.z / 2),
+        new THREE.Vector3(tamanho.x / 2, -tamanho.y / 2, -tamanho.z / 2),
+        new THREE.Vector3(-tamanho.x / 2, -tamanho.y / 2, tamanho.z / 2),
+      ]) {
+        // componentes do canto na base da câmera
+        const vz = corner.dot(fwd)          // profundidade
+        const vx = Math.abs(corner.dot(right))
+        const vy = Math.abs(corner.dot(up))
+        if (vz <= 0) { dist = Math.max(dist, raio * 2); continue }
+        // d tal que vx/(d+vz) <= tanH  e  vy/(d+vz) <= tanV
+        const dNecessaria = Math.max(vx / tanH, vy / tanV) - vz
+        dist = Math.max(dist, dNecessaria)
+      }
+      dist = Math.max(dist, raio) * 1.12   // folga de 12%
+
       if (controls) controls.target.copy(centro)
       camera.position.copy(centro).add(dir.multiplyScalar(dist))
+      camera.lookAt(centro)
       camera.updateProjectionMatrix()
-      if (controls) (controls as any).update?.()
+      // duas atualizações: anula o amortecimento do OrbitControls, que
+      // senão deixaria a câmera parada no meio do caminho (não centralizava)
+      if (controls) { (controls as any).update?.(); (controls as any).update?.() }
     }
 
     ;(window as any).__enquadrar = enquadrar

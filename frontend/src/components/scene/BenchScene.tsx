@@ -5,6 +5,7 @@
 import React, { useRef, useEffect } from 'react'
 import { Html } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
+import * as THREE from 'three'
 import { SceneObject, MountSlotView, ConduitView, Connection, DrivetrainView } from '../../store/sceneStore'
 import { LiveWire, WireDomain } from './LiveWire'
 import { MagneticSnap } from './MagneticSnap'
@@ -74,8 +75,14 @@ const RecipeMesh: React.FC<{
 }> = ({ obj, selected, onSelect, onPortDown, onPortClick }) => {
   const receita = receitaPara(obj.type_id || '', obj.properties)
   if (!receita) return null
+  // backend guarda rotação em GRAUS; three.js usa RADIANOS
+  const rad: [number, number, number] = [
+    THREE.MathUtils.degToRad(obj.rotation?.[0] ?? 0),
+    THREE.MathUtils.degToRad(obj.rotation?.[1] ?? 0),
+    THREE.MathUtils.degToRad(obj.rotation?.[2] ?? 0),
+  ]
   return (
-    <group position={obj.position} rotation={obj.rotation}>
+    <group position={obj.position} rotation={rad}>
       {/* toda a peça é clicável (evento sobe das malhas filhas) */}
       <group onClick={(e) => { e.stopPropagation(); onSelect(obj.id) }}>
         <ModeloReceita receita={receita} onPortDown={onPortDown} onPortClick={onPortClick} />

@@ -12,6 +12,7 @@
 import React, { useMemo } from 'react'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
+import { travarCamera } from './CameraLock'
 
 // ============================================================
 // MATERIAIS (presets industriais — baratos, sem textura por enquanto)
@@ -253,7 +254,11 @@ export const ModeloReceita: React.FC<{
       {mostrarBornes && bornes.map(([pid, pos]) => (
         <mesh key={`borne-${pid}`} position={pos as [number, number, number]}
           onClick={onPortClick ? (e) => { e.stopPropagation(); onPortClick(pid) } : undefined}
-          onPointerDown={onPortDown ? (e) => { e.stopPropagation(); onPortDown(pid) } : undefined}
+          onPointerDown={onPortDown ? (e) => {
+            e.stopPropagation()
+            travarCamera()          // a câmera não pode roubar o gesto
+            onPortDown(pid)
+          } : undefined}
           onPointerOver={() => { if (onPortClick || onPortDown) document.body.style.cursor = 'crosshair' }}
           onPointerOut={() => { document.body.style.cursor = '' }}
         >

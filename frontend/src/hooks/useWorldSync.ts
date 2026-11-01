@@ -75,12 +75,15 @@ export const useWorldSync = (enabled = true, intervalMs = POLL_MS) => {
         }
         const bpos = n.transform?.position
         const hasPos = Array.isArray(bpos) && bpos.length === 3 && (bpos[0] !== 0 || bpos[2] !== 0)
+        const brot = n.transform?.rotation
         objs[id] = {
           id,
           type: (n.name || id).slice(0, 24),
           type_id: n.type_id || '',
           position: (hasPos ? bpos : slotFor(idx)) as [number, number, number],
-          rotation: [0, 0, 0],
+          // rotação real do backend (graus) — era descartada e por isso
+          // girar uma peça não surtia efeito visual
+          rotation: (Array.isArray(brot) && brot.length === 3 ? brot : [0, 0, 0]) as [number, number, number],
           scale: (n.transform?.scale?.length === 3 ? n.transform.scale : scaleFor(n.category)) as [number, number, number],
           properties: n.properties || {},
           layer: n.layer || 'devices',

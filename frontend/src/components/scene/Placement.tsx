@@ -12,6 +12,7 @@ import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ModeloReceita } from './ModelKit'
 import { receitaPara } from './recipes'
+import { travarCamera } from './CameraLock'
 import type { SceneObject } from '../../store/sceneStore'
 
 const ALTURA_CENA = 0.5  // altura do plano de referência do grid do backend
@@ -151,10 +152,15 @@ export const Placement: React.FC<PlacementProps> = ({
   const grupoRef = useRef<THREE.Group>(null)
 
   // estado do arraste: altura e rotação atuais do selecionado
+  // (a peça já pode ter rotação/altura salvas no backend — em graus)
   const alturaAtual = selecionado?.position?.[1] ?? ALTURA_CENA
   const [elevando, setElevando] = useState<number | null>(null)
-  const [girando, setGirando] = useState<number>(0)
+  const yawSalvo = (selecionado?.rotation?.[0] ?? 0) * Math.PI / 180
+  const [girando, setGirando] = useState<number>(yawSalvo)
   const ultimoY = useRef(0)
+
+  // sincroniza o giro local quando a seleção muda
+  useEffect(() => { setGirando(yawSalvo) }, [selecionado?.id]) // eslint-disable-line
 
   useEffect(() => {
     if (!movendo) return
@@ -262,7 +268,7 @@ export const Placement: React.FC<PlacementProps> = ({
           <mesh
             rotation={[-Math.PI / 2, 0, 0]}
             position={[0, -selecionado.position[1] + 0.02, 0]}
-            onPointerDown={(e) => { e.stopPropagation(); setMovendo(true) }}
+            onPointerDown={(e) => { e.stopPropagation(); travarCamera(); setMovendo(true) }}
             onPointerOver={() => { document.body.style.cursor = 'move' }}
             onPointerOut={() => { document.body.style.cursor = '' }}
           >

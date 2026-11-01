@@ -242,6 +242,67 @@ async def snap_magnetic(req: SnapRequest):
     }
 
 
+class SnapShaftRequest(BaseModel):
+    transmissao_id: str     # engrenagem/correia/fuso...
+    motor_id: str           # Motor/VFD que tem o eixo
+    shaft_fixation_id: str = "eixo_entrada"
+    motor_port: str = "shaft_out"
+
+
+@router.post("/snap-shaft")
+async def snap_shaft(req: SnapShaftRequest):
+    """
+    Encaixe por EIXO: alinha o cubo da transmissão ao eixo do motor.
+
+    Diferente do snap por base (que alinha um furo): aqui o que encaixa é o
+    EIXO — a transmissão é posicionada de forma que o eixo do motor passe
+    pelo cubo de entrada, com a mesma orientação do eixo do motor.
+    """
+    world = state.engine.world
+    trans = world.get_node(req.transmissao_id)
+    motor = world.get_node(req.motor_id)
+    if not trans or not motor:
+        raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+
+    fix = next((f for f in trans.shaft_fixations if f.id == req.shaft_fixation_id), None)
+    if not fix:
+        raise HTTPException(status_code=400,
+                            detail=f"{trans.type_id} não tem fixação de eixo '{req.shaft_fixation_id}'")
+
+    # eixo do motor = direção do seu borne de saída (ou +X por padrão)
+    ancora = motor.port_anchors.get(req.motor_port)
+    if ancora:
+        # normal do eixo = para fora do motor, no plano do borne
+        eixo_dir = (1.0, 0.0, 0.0)
+    else:
+        eixo_dir = (1.0, 0.0, 0.0)
+
+    # posição do cubo = posição do eixo do motor (borne como referência)
+    hub_alvo = ancora or motor.transform.position
+    # desloca a transmissão para que o cubo encoste no eixo
+    gap = 0.06
+    novo = (
+        hub_alvo[0] - fix.local_offset[0] + eixo_dir[0] * gap,
+        hub_alvo[1] - fix.local_offset[1] + eixo_dir[1] * gap,
+        hub_alvo[2] - fix.local_offset[2] + eixo_dir[2] * gap,
+    )
+    trans.place(novo)
+    world.version += 1
+
+    await state.event_bus.emit("shaft_snapped", {
+        "transmissao": trans.id, "motor": motor.id,
+        "hub": fix.id, "posicao": list(novo),
+    })
+    return {
+        "success": True,
+        "transmissao_id": trans.id,
+        "motor_id": motor.id,
+        "hub": fix.id,
+        "position": list(novo),
+        "eixo_dir": list(eixo_dir),
+    }
+
+
 @router.post("/grid-snap")
 async def grid_snap(req: GridSnapRequest):
     """Snap fino do dispositivo à grade do mundo."""

@@ -10,6 +10,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Html } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { travarCamera } from './CameraLock'
 import type { SceneObject } from '../../store/sceneStore'
 
 export interface PortaVisivel {
@@ -206,7 +207,11 @@ export const PortAnchors: React.FC<PortAnchorsProps> = ({
                   if (ehAlvo) onConectar(p.qualifiedId)
                   else if (!ehOrigem) onIniciarFiação(p.qualifiedId)
                 }}
-                onPointerDown={(e) => { e.stopPropagation(); setArrastando(p.qualifiedId) }}
+                onPointerDown={(e) => {
+                  e.stopPropagation()
+                  travarCamera()   // sem isso, arrastar o borne gira a cena
+                  setArrastando(p.qualifiedId)
+                }}
                 onPointerOver={(e) => { e.stopPropagation(); setHover(p.qualifiedId) }}
                 onPointerOut={() => setHover(null)}
               >

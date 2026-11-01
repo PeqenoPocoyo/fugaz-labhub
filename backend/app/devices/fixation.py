@@ -243,9 +243,51 @@ STANDARD_FIXATIONS: Dict[str, List[FixationPoint]] = {
         FixationPoint("flange_traseira", (0, 0, -0.075), (0, 0, -1), FixDomain.MECHANICAL, 0.2, "Flange traseira"),
         FixationPoint("articulacao", (0, 0, 0.075), (0, 0, 1), FixDomain.MECHANICAL, 0.2, "Articulação dianteira"),
     ],
+    "cylinder_hydraulic": [
+        FixationPoint("flange_traseira", (0, 0, -0.09), (0, 0, -1), FixDomain.MECHANICAL, 0.25, "Flange traseira"),
+        FixationPoint("articulacao", (0, 0, 0.09), (0, 0, 1), FixDomain.MECHANICAL, 0.25, "Articulação dianteira"),
+    ],
+}
+
+# ============================================================
+# FIXAÇÃO POR EIXO (shaft) — transmissões montam no eixo do motor
+# ============================================================
+# Diferente da fixação por base: aqui o que encaixa é o EIXO. O ponto de
+# fixação tem domain=mechanical e normal ao longo do eixo, e o slot é o
+# cubo do elemento de transmissão (rasgo de chaveta).
+
+SHAFT_FIXATIONS: Dict[str, List[FixationPoint]] = {
+    # engrenagens: cubo de entrada e de saída
+    "trans_gears": [
+        FixationPoint("eixo_entrada", (0, 0, 0), (1, 0, 0), FixDomain.MECHANICAL, 0.16, "Cubo de entrada"),
+        FixationPoint("eixo_saida", (0, 0, 0), (-1, 0, 0), FixDomain.MECHANICAL, 0.16, "Cubo de saída"),
+    ],
+    "trans_belt": [
+        FixationPoint("eixo_entrada", (0, 0, 0), (1, 0, 0), FixDomain.MECHANICAL, 0.14, "Polia motora"),
+        FixationPoint("eixo_saida", (0, 0, 0), (-1, 0, 0), FixDomain.MECHANICAL, 0.18, "Polia movida"),
+    ],
+    "trans_chain": [
+        FixationPoint("eixo_entrada", (0, 0, 0), (1, 0, 0), FixDomain.MECHANICAL, 0.14, "Rodeta motora"),
+        FixationPoint("eixo_saida", (0, 0, 0), (-1, 0, 0), FixDomain.MECHANICAL, 0.18, "Rodeta movida"),
+    ],
+    "trans_coupling": [
+        FixationPoint("eixo_entrada", (0, 0, 0), (1, 0, 0), FixDomain.MECHANICAL, 0.18, "Metade motora"),
+        FixationPoint("eixo_saida", (0, 0, 0), (-1, 0, 0), FixDomain.MECHANICAL, 0.18, "Metade movida"),
+    ],
+    "trans_screw": [
+        FixationPoint("eixo_entrada", (0, 0, 0), (1, 0, 0), FixDomain.MECHANICAL, 0.14, "Eixo do fuso"),
+    ],
+    "trans_linear_actuator": [
+        FixationPoint("eixo_entrada", (0, 0, 0), (1, 0, 0), FixDomain.MECHANICAL, 0.14, "Eixo do fuso"),
+    ],
 }
 
 
 def fixations_for(type_id: str) -> List[FixationPoint]:
     """Retorna os pontos de fixação padrão de um tipo de dispositivo."""
-    return STANDARD_FIXATIONS.get(type_id, [])
+    return list(STANDARD_FIXATIONS.get(type_id, []))
+
+
+def shaft_fixations_for(type_id: str) -> List[FixationPoint]:
+    """Pontos de fixação por EIXO (transmissões montam no eixo do motor)."""
+    return list(SHAFT_FIXATIONS.get(type_id, []))

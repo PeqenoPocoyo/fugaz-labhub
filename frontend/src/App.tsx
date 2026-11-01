@@ -14,6 +14,7 @@ import { Inspector } from './components/shell/Inspector'
 import { BenchScene } from './components/scene/BenchScene'
 import { Placement } from './components/scene/Placement'
 import { FrameController } from './components/scene/FrameController'
+import { CameraLock } from './components/scene/CameraLock'
 import { bornesDe } from './components/scene/recipes'
 import { CameraPiP } from './components/scene/CameraPiP'
 import { CommandPalette } from './components/command/CommandPalette'
@@ -205,10 +206,18 @@ const App: React.FC = () => {
           window.dispatchEvent(new CustomEvent('labhub:enquadrar', { detail: { alvo: 'selecionado' } }))
         }
       }
+      // Delete/Backspace remove o dispositivo selecionado
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+          e.preventDefault()
+          handleRemover(selectedId)
+        }
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [selectedId, handleRemover, handleRotaFio, handlePortDownModelo])
 
   const removerLogs = () => setLogs([])
   const resetar = async () => {
@@ -369,6 +378,7 @@ const App: React.FC = () => {
             onRot={() => {}}
           />
           <FrameController objects={objects} selecionado={selectedId} />
+          <CameraLock />
           <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
         </Canvas>
 

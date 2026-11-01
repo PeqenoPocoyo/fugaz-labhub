@@ -7,6 +7,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { travarCamera } from './CameraLock'
 
 interface WireGrabProps {
   wireId: string
@@ -88,7 +89,7 @@ export const WireGrab: React.FC<WireGrabProps> = ({ wireId, from, to, waypoints,
     <mesh
       position={pos}
       rotation={[-Math.PI / 2, 0, 0]}
-      onPointerDown={(e) => { e.stopPropagation(); setArrastando(idx) }}
+      onPointerDown={(e) => { e.stopPropagation(); travarCamera(); setArrastando(idx) }}
       onDoubleClick={(e) => {
         e.stopPropagation()
         // duplo clique remove o waypoint (volta ao automático)
