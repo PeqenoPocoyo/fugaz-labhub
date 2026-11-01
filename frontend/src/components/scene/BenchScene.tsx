@@ -2,9 +2,9 @@
 // + malhas especializadas (esteiras escaláveis, transmissões, visão, fluidos)
 // + ligações mecânicas do trem de força.
 // Recebe tudo por PROPS (App assina a store) — evita problema de reconciler R3F.
-import React, { useRef } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { Html } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { SceneObject, MountSlotView, ConduitView, Connection, DrivetrainView } from '../../store/sceneStore'
 import { LiveWire, WireDomain } from './LiveWire'
 import { MagneticSnap } from './MagneticSnap'
@@ -13,6 +13,17 @@ import {
   ConveyorMesh, RollerConveyorMesh, TransmissionMesh, TapeMesh, MarkerMesh,
   TargetMesh, CornerMesh, DuctMesh, PumpMesh, ValveMesh, TankMesh, MechanicalBond,
 } from './SceneElements'
+import { ModeloReceita } from './ModelKit'
+import { receitaPara } from './recipes'
+
+/** Sonda de performance — expõe o renderer para medir calls/triângulos */
+const PerfProbe: React.FC = () => {
+  const gl = useThree(s => s.gl)
+  useEffect(() => {
+    ;(window as any).__renderer = gl
+  }, [gl])
+  return null
+}
 
 const CAT_COLOR: Record<string, string> = {
   plc: '#00D4FF', sensor: '#66BB6A', actuator: '#FFA726', drive: '#AB47BC',
@@ -39,6 +50,26 @@ const SPECIALIZED: Record<string, React.FC<{ obj: SceneObject }>> = {
   pump_dosing: PumpMesh,
   valve_control: ValveMesh,
   tank: TankMesh,
+}
+
+/** Pipeline A: dispositivos modelados por receita declarativa */
+const RECIPE_TYPES = ['motor_dc', 'sensor_photoelectric', 'infra_base_plate']
+
+const RecipeMesh: React.FC<{ obj: SceneObject }> = ({ obj }) => {
+  const receita = receitaPara(obj.type_id || '', obj.properties)
+  if (!receita) return null
+  return (
+    <group position={obj.position}>
+      <ModeloReceita receita={receita} />
+      {/* etiqueta flutuante */}
+      <Html position={[0, 0.45, 0]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
+        <div className="flex items-center gap-1 bg-[#141922]/85 border border-[#232C38] rounded px-1.5 py-0.5 whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-sm" style={{ background: '#00D4FF' }} />
+          <span className="text-[9px] font-mono text-[#D7DEE8]">{String(obj.type).slice(0, 16)}</span>
+        </div>
+      </Html>
+    </group>
+  )
 }
 
 /** Mapeia domínio do backend para WireDomain do fio */
@@ -140,6 +171,8 @@ export const BenchScene: React.FC<BenchSceneProps> = ({
 
   return (
     <group onClick={() => onSelect('')}>
+      <PerfProbe />
+
       {/* Dutos e calhas (infra de condução) */}
       {conduits.map(c => (
         <ConduitRun key={c.id} path={c.path} kind={c.kind as any} />
@@ -171,6 +204,9 @@ export const BenchScene: React.FC<BenchSceneProps> = ({
       {nodes.map(([id, obj]) => {
         const Special = obj.type_id ? SPECIALIZED[obj.type_id] : undefined
         if (Special) return <Special key={id} obj={obj} />
+        if (obj.type_id && RECIPE_TYPES.includes(obj.type_id)) {
+          return <RecipeMesh key={id} obj={obj} />
+        }
         return (
           <NodeMesh
             key={id}
