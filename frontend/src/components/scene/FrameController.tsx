@@ -10,9 +10,11 @@ import type { SceneObject } from '../../store/sceneStore'
 
 interface FrameProps {
   objects: Record<string, SceneObject>
+  /** id do dispositivo selecionado (para "enquadrar no item") */
+  selecionado?: string | null
 }
 
-export const FrameController: React.FC<FrameProps> = ({ objects }) => {
+export const FrameController: React.FC<FrameProps> = ({ objects, selecionado }) => {
   const camera = useThree(s => s.camera)
   const ctl = useThree(s => s.controls)
   const gl = useThree(s => s.gl)
@@ -20,20 +22,30 @@ export const FrameController: React.FC<FrameProps> = ({ objects }) => {
   const controls = ctl as any as { target: THREE.Vector3; update?: () => void } | null
 
   useEffect(() => {
-    const enquadrar = () => {
-      const pts = Object.values(objects)
+    const enquadrar = (ev?: Event) => {
+      const alvo = (ev as CustomEvent)?.detail?.alvo ?? 'tudo'
+
+      // ---- quais itens entram no enquadramento ----
+      let pts: SceneObject[] = []
+      if (alvo === 'selecionado') {
+        const um = selecionado ? objects[selecionado] : null
+        if (!um) return
+        pts = [um]
+      } else {
+        pts = Object.values(objects)
+      }
       if (pts.length === 0) return
 
-      // caixa dos limites da cena (centro + raio)
+      // caixa dos limites (centro + raio) — para um item só, caixa mínima
       const box = new THREE.Box3()
       for (const o of pts) {
         const s = o.scale || [0.6, 0.6, 0.6]
-        const m = Math.max(s[0], s[1], s[2])
+        const m = Math.max(s[0], s[1], s[2]) * 0.75
         box.expandByPoint(new THREE.Vector3(o.position[0] - m, o.position[1] - m, o.position[2] - m))
         box.expandByPoint(new THREE.Vector3(o.position[0] + m, o.position[1] + m, o.position[2] + m))
       }
       const centro = box.getCenter(new THREE.Vector3())
-      const raio = Math.max(0.8, box.getSize(new THREE.Vector3()).length() / 2)
+      const raio = Math.max(alvo === 'selecionado' ? 0.55 : 0.8, box.getSize(new THREE.Vector3()).length() / 2)
 
       // distância para caber no FOV (com folga de 15%)
       const fov = THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov)

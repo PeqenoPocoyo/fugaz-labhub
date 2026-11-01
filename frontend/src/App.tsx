@@ -20,7 +20,7 @@ import { CommandPalette } from './components/command/CommandPalette'
 import DiagnosisConsole from './components/diagnostics/DiagnosisConsole'
 import { NoticeStack, useNotices } from './components/diagnostics/NoticeStack'
 import {
-  Layers, Crosshair, Trash2, Zap, Search, Radio, Play, Pause, Terminal,
+  Layers, Crosshair, Focus, Trash2, Zap, Search, Radio, Play, Pause, Terminal, ChevronDown,
 } from 'lucide-react'
 import './styles/base.css'
 import './styles/shell.css'
@@ -42,6 +42,7 @@ const App: React.FC = () => {
   const [simRunning, setSimRunning] = React.useState(false)
   const [paletteOpen, setPaletteOpen] = React.useState(false)
   const [consoleAberto, setConsoleAberto] = React.useState(true)
+  const [menuEnquadrar, setMenuEnquadrar] = React.useState(false)
   const [fiaçãoDe, setFiaçãoDe] = React.useState<string | null>(null)
   const { notices, push, dismiss } = useNotices()
   const booted = React.useRef(false)
@@ -196,7 +197,14 @@ const App: React.FC = () => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o) }
       if (e.key === 'Escape') setFiaçãoDe(null)
-      if (e.key === 'Home') { e.preventDefault(); window.dispatchEvent(new Event('labhub:enquadrar')) }
+      if (e.key === 'Home') { e.preventDefault(); window.dispatchEvent(new CustomEvent('labhub:enquadrar', { detail: { alvo: 'tudo' } })) }
+      if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+          e.preventDefault()
+          window.dispatchEvent(new CustomEvent('labhub:enquadrar', { detail: { alvo: 'selecionado' } }))
+        }
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -210,7 +218,8 @@ const App: React.FC = () => {
 
   const commands = React.useMemo(() => [
     { id: 'sim_toggle', group: 'Simulação', label: simRunning ? 'Parar simulação' : 'Iniciar simulação', hint: '60Hz', icon: simRunning ? Pause : Play, run: toggleSim },
-    { id: 'enquadrar', group: 'Visualização', label: 'Enquadrar tudo', hint: 'Home', icon: Crosshair, run: () => window.dispatchEvent(new Event('labhub:enquadrar')) },
+    { id: 'enquadrar', group: 'Visualização', label: 'Enquadrar tudo', hint: 'Home', icon: Crosshair, run: () => window.dispatchEvent(new CustomEvent('labhub:enquadrar', { detail: { alvo: 'tudo' } })) },
+    { id: 'enquadrar_sel', group: 'Visualização', label: 'Enquadrar no selecionado', hint: 'F', icon: Focus, run: () => window.dispatchEvent(new CustomEvent('labhub:enquadrar', { detail: { alvo: 'selecionado' } })) },
     { id: 'xray_max', group: 'Visualização', label: 'Raio-X: mostrar tudo', icon: Layers, run: () => setXray(1) },
     { id: 'console', group: 'Visualização', label: consoleAberto ? 'Fechar console' : 'Abrir console', icon: Terminal, run: () => setConsoleAberto(v => !v) },
     { id: 'clear_log', group: 'Diagnóstico', label: 'Limpar log', icon: Terminal, run: removerLogs },
@@ -238,11 +247,45 @@ const App: React.FC = () => {
 
         <div style={{ flex: 1 }} />
 
-        <button className="sh-btn"
-          onClick={() => window.dispatchEvent(new Event('labhub:enquadrar'))}
-          title="Enquadrar tudo (Home)">
-          <Crosshair size={10} /> enquadrar
-        </button>
+        {/* enquadrar: menu com "tudo" e "no selecionado" */}
+        <div style={{ position: 'relative', display: 'inline-flex' }}>
+          <button className="sh-btn" style={{ borderRight: 'none' }}
+            onClick={() => window.dispatchEvent(new CustomEvent('labhub:enquadrar', { detail: { alvo: 'tudo' } }))}
+            title="Enquadrar tudo (Home)">
+            <Crosshair size={10} /> enquadrar
+          </button>
+          <button className="sh-btn" style={{ padding: '0 5px' }}
+            onClick={() => setMenuEnquadrar(v => !v)}
+            title="Opções de enquadramento">
+            <ChevronDown size={9} />
+          </button>
+          {menuEnquadrar && (
+            <>
+              {/* fecha ao clicar fora */}
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuEnquadrar(false)} />
+              <div className="fz-mono" style={{
+                position: 'absolute', top: 24, right: 0, zIndex: 41, minWidth: 210,
+                background: 'var(--panel)', border: '1px solid var(--line-str)', padding: 2,
+              }}>
+                <button className="sh-item" style={{ width: '100%', height: 24, border: 'none' }}
+                  onClick={() => { window.dispatchEvent(new CustomEvent('labhub:enquadrar', { detail: { alvo: 'tudo' } })); setMenuEnquadrar(false) }}>
+                  <Crosshair size={10} style={{ color: 'var(--tx-mut)' }} />
+                  <span>Enquadrar tudo</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 8, color: 'var(--tx-dim)' }}>Home</span>
+                </button>
+                <button className="sh-item" style={{ width: '100%', height: 24, border: 'none' }}
+                  disabled={!selectedId}
+                  onClick={() => { window.dispatchEvent(new CustomEvent('labhub:enquadrar', { detail: { alvo: 'selecionado' } })); setMenuEnquadrar(false) }}>
+                  <Focus size={10} style={{ color: selectedId ? 'var(--acc)' : 'var(--tx-dim)' }} />
+                  <span style={{ color: selectedId ? 'var(--tx)' : 'var(--tx-dim)' }}>
+                    Enquadrar no selecionado
+                  </span>
+                  <span style={{ marginLeft: 'auto', fontSize: 8, color: 'var(--tx-dim)' }}>F</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
         <button className="sh-btn" onClick={() => setPaletteOpen(true)} title="Comandos (Ctrl+K)">
           <Search size={10} /> comandos
         </button>
@@ -325,7 +368,7 @@ const App: React.FC = () => {
             onMover={handleMover}
             onRot={() => {}}
           />
-          <FrameController objects={objects} />
+          <FrameController objects={objects} selecionado={selectedId} />
           <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
         </Canvas>
 
