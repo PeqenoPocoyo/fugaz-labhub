@@ -16,6 +16,7 @@ import {
 import { ModeloReceita } from './ModelKit'
 import { receitaPara } from './recipes'
 import { PortAnchors } from './PortAnchors'
+import { WireGrab } from './WireGrab'
 
 /** Sonda de performance — expõe o renderer para medir calls/triângulos */
 const PerfProbe: React.FC = () => {
@@ -152,11 +153,12 @@ interface BenchSceneProps {
   onIniciarFiação: (qualifiedId: string) => void
   onConectar: (alvo: string) => void
   onCancelarFiação: () => void
+  onRotaFio: (connectionId: string, path: [number, number, number][]) => void
 }
 
 export const BenchScene: React.FC<BenchSceneProps> = ({
   objects, connections, slots, conduits, drivetrains, selectedId, fiaçãoDe,
-  onSelect, onIniciarFiação, onConectar, onCancelarFiação,
+  onSelect, onIniciarFiação, onConectar, onCancelarFiação, onRotaFio,
 }) => {
   const nodes = Object.entries(objects)
   const freeSlots = slots.filter(s => !s.occupied)
@@ -195,14 +197,23 @@ export const BenchScene: React.FC<BenchSceneProps> = ({
 
       {/* Fios vivos (conexões reais) */}
       {connections.map(c => (
-        <LiveWire
-          key={c.id}
-          from={c.from}
-          to={c.to}
-          domain={toWireDomain(c.domain)}
-          active
-          gauge={c.domain === 'hydraulic' ? 1.6 : c.domain === 'data' ? 0.6 : 1}
-        />
+        <group key={c.id}>
+          <LiveWire
+            from={c.from}
+            to={c.to}
+            domain={toWireDomain(c.domain)}
+            active
+            gauge={c.domain === 'hydraulic' ? 1.6 : c.domain === 'data' ? 0.6 : 1}
+            waypoints={c.properties?.path}
+          />
+          <WireGrab
+            wireId={c.id}
+            from={c.from}
+            to={c.to}
+            waypoints={c.properties?.path}
+            onCommit={(path) => onRotaFio(c.id, path)}
+          />
+        </group>
       ))}
 
       {/* Anéis magnéticos nos slots LIVRES (convite ao encaixe) */}

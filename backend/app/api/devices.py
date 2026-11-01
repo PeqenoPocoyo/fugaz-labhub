@@ -13,6 +13,7 @@ router = APIRouter()
 class SpawnRequest(BaseModel):
     type_id: str
     position: Optional[List[float]] = None
+    rotation: Optional[List[float]] = None   # yaw/pitch/roll em graus
     layer: Optional[str] = "devices"
     properties: Optional[dict] = None
 
@@ -58,6 +59,9 @@ async def spawn_device(req: SpawnRequest):
         device.place(tuple(req.position))
     else:
         device.place(state.engine.world.next_slot_position())
+
+    if req.rotation is not None and len(req.rotation) == 3:
+        device.transform.rotation = tuple(req.rotation)
     if req.properties:
         device.properties.update(req.properties)
 

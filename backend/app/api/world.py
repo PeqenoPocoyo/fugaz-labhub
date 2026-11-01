@@ -14,6 +14,7 @@ class ConnectRequest(BaseModel):
     from_port: str
     to_port: str
     properties: Optional[dict] = None
+    path: Optional[List[List[float]]] = None   # waypoints do fio (rota do usuário)
 
 
 @router.get("/")
@@ -35,7 +36,27 @@ async def connect(req: ConnectRequest):
     conn = state.engine.world.connect(req.from_port, req.to_port, req.properties)
     if not conn:
         raise HTTPException(status_code=400, detail="Falha ao conectar portas")
+    # rota definida pelo usuário (waypoints) — o fio passa a ter caminho próprio
+    if req.path:
+        conn.properties["path"] = [list(p) for p in req.path]
     await state.event_bus.emit("connection_created", conn.to_dict())
+    return {"success": True, "connection": conn.to_dict()}
+
+
+class PathRequest(BaseModel):
+    path: Optional[List[List[float]]] = None   # None = volta ao automático
+
+
+@router.patch("/connections/{connection_id}")
+async def set_connection_path(connection_id: str, req: PathRequest):
+    """Define (ou limpa) o caminho de um fio — usado ao arrastar a rota."""
+    conn = state.engine.world.connections.connections.get(connection_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Conexão não encontrada")
+    if req.path:
+        conn.properties["path"] = [list(p) for p in req.path]
+    else:
+        conn.properties.pop("path", None)
     return {"success": True, "connection": conn.to_dict()}
 
 

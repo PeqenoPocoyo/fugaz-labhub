@@ -38,14 +38,14 @@ def create_vfd() -> Device:
             "direction": 1,  # 1=frente, -1=reverso
         },
         ports=[
-            # Alimentação
+            # Alimentação (entrada da rede)
             Port.power("l1", "L1"),
             Port.power("l2", "L2"),
             Port.power("l3", "L3"),
-            # Saída para motor
-            Port.power("u", "Motor U"),
-            Port.power("v", "Motor V"),
-            Port.power("w", "Motor W"),
+            # Saída para o motor — direção OUTPUT (alimenta a carga)
+            Port.power("u", "Motor U", PortDirection.OUTPUT),
+            Port.power("v", "Motor V", PortDirection.OUTPUT),
+            Port.power("w", "Motor W", PortDirection.OUTPUT),
             # Controle digital
             Port.digital_input("di_start", "DI Start"),
             Port.digital_input("di_stop", "DI Stop"),

@@ -3,6 +3,7 @@
 // + atitude Factory I/O (a cena 3D domina, dados vivos na peça).
 // Zero decoração: cada pixel carrega dado ou é respiro.
 import React from 'react'
+import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid, PerspectiveCamera } from '@react-three/drei'
 import { useSimulation } from './hooks/useSimulation'
@@ -11,6 +12,7 @@ import { useSceneStore } from './store/sceneStore'
 import { ProjectTree } from './components/shell/ProjectTree'
 import { Inspector } from './components/shell/Inspector'
 import { BenchScene } from './components/scene/BenchScene'
+import { Placement } from './components/scene/Placement'
 import { CameraPiP } from './components/scene/CameraPiP'
 import { CommandPalette } from './components/command/CommandPalette'
 import DiagnosisConsole from './components/diagnostics/DiagnosisConsole'
@@ -32,6 +34,8 @@ const App: React.FC = () => {
   const selectedObj = selectedId ? objects[selectedId] ?? null : null
 
   const [dragOver, setDragOver] = React.useState(false)
+  // type_id sendo arrastado da árvore → fantasma de posicionamento
+  const [pendente, setPendente] = React.useState<string | null>(null)
   const [xray, setXray] = React.useState(1)
   const [simRunning, setSimRunning] = React.useState(false)
   const [paletteOpen, setPaletteOpen] = React.useState(false)
@@ -73,8 +77,42 @@ const App: React.FC = () => {
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false)
+    // com fantasma ativo, quem posiciona é o Placement (evita spawn duplo)
+    if (pendente) return
     const typeId = e.dataTransfer.getData('deviceType')
     if (typeId) handleQuickAdd(typeId)
+  }
+
+  // spawn na posição escolhida com o fantasma (com rotação em graus)
+  const handleSpawnEm = async (typeId: string, pos: [number, number, number], rotY: number) => {
+    try {
+      const r = await fetch('/api/devices/spawn', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type_id: typeId,
+          position: pos,
+          rotation: [THREE.MathUtils.radToDeg(rotY), 0, 0],
+        }),
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const d = await r.json()
+      push({ severity: 'success', title: `${d.name} posicionado`, source: 'spawn' })
+      addLog('success', 'spawn', `${d.name} em (${pos.map(n => n.toFixed(1)).join(', ')}) rotação ${Math.round(THREE.MathUtils.radToDeg(rotY))}°`)
+      setPendente(null)
+    } catch {
+      push({ severity: 'error', title: 'Falha ao posicionar', source: 'spawn' })
+      setPendente(null)
+    }
+  }
+
+  // mover dispositivo existente (arraste pela alça)
+  const handleMover = async (id: string, pos: [number, number, number], rotY: number) => {
+    try {
+      await fetch(`/api/devices/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transform: { position: pos, rotation: [THREE.MathUtils.radToDeg(rotY), 0, 0] } }),
+      })
+    } catch { /* silencioso durante o arraste */ }
   }
 
   const toggleSim = () => {
@@ -105,6 +143,19 @@ const App: React.FC = () => {
     } catch (e: any) {
       push({ severity: 'error', title: 'Não conectou', source: 'wire', detail: String(e?.message || e) })
       addLog('error', 'wire', `Falha ao conectar: ${String(e?.message || e)}`)
+    }
+  }
+
+  // commit da rota de um fio (arrastar e puxar)
+  const handleRotaFio = async (connectionId: string, path: [number, number, number][]) => {
+    try {
+      await fetch(`/api/world/connections/${connectionId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      })
+      addLog('info', 'wire', `Rota do fio ${connectionId} atualizada (${path.length} pontos)`)
+    } catch {
+      push({ severity: 'error', title: 'Falha ao salvar rota', source: 'wire' })
     }
   }
 
@@ -193,7 +244,10 @@ const App: React.FC = () => {
 
       {/* ---------- ÁRVORE DE PROJETO ---------- */}
       <aside className="sh-tree">
-        <ProjectTree onSpawn={handleQuickAdd} onDragStart={() => setDragOver(true)} />
+        <ProjectTree
+          onSpawn={handleQuickAdd}
+          onDragStart={(typeId) => { setDragOver(true); setPendente(typeId) }}
+        />
       </aside>
 
       {/* ---------- ÁREA DE TRABALHO 3D ---------- */}
@@ -204,11 +258,33 @@ const App: React.FC = () => {
 
         <Canvas className="w-full h-full" camera={{ position: [8, 7, 8], fov: 45 }}>
           <PerspectiveCamera makeDefault position={[8, 7, 8]} fov={45} />
-          <ambientLight intensity={0.38} />
+          <ambientLight intensity={0.4} />
           <directionalLight position={[8, 12, 6]} intensity={0.85} />
           <hemisphereLight args={['#1A2130', '#0B0E13', 0.45]} />
-          <Grid args={[40, 40]} cellSize={0.5} cellColor="#161C26" sectionSize={2.5} sectionColor="#1E2630"
-            fadeDistance={45} infiniteGrid />
+
+          {/* CHÃO DA CELA — sempre visível, mesmo vazio.
+              Plano escuro (dá "piso") + grade legível + eixos na origem. */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
+            <planeGeometry args={[60, 60]} />
+            <meshStandardMaterial color="#121821" roughness={0.94} metalness={0.05} />
+          </mesh>
+          <Grid
+            args={[60, 60]}
+            cellSize={0.5}
+            cellColor="#26303E"
+            cellThickness={0.6}
+            sectionSize={2.5}
+            sectionColor="#39475A"
+            sectionThickness={0.9}
+            fadeDistance={55}
+            fadeStrength={1.2}
+          />
+          {/* eixos de referência na origem (CAD: X vermelho, Z verde) */}
+          <group position={[0, 0.004, 0]}>
+            <mesh position={[1.25, 0, 0]}><boxGeometry args={[2.5, 0.002, 0.02]} /><meshBasicMaterial color="#C0392B" /></mesh>
+            <mesh position={[0, 0, 1.25]}><boxGeometry args={[0.02, 0.002, 2.5]} /><meshBasicMaterial color="#27AE60" /></mesh>
+            <mesh><cylinderGeometry args={[0.05, 0.05, 0.002, 20]} /><meshBasicMaterial color="#4A5563" /></mesh>
+          </group>
           <BenchScene
             objects={objects}
             connections={connections}
@@ -221,6 +297,16 @@ const App: React.FC = () => {
             onIniciarFiação={(q) => setFiaçãoDe(q)}
             onConectar={handleConectar}
             onCancelarFiação={() => setFiaçãoDe(null)}
+            onRotaFio={handleRotaFio}
+          />
+          {/* posicionamento: fantasma ao arrastar da árvore + mover selecionado */}
+          <Placement
+            pendente={pendente}
+            selecionado={selectedObj}
+            slotsLivres={slots.filter(s => !s.occupied).map(s => ({ id: s.id, position: s.position }))}
+            onSpawn={handleSpawnEm}
+            onMover={handleMover}
+            onRot={() => {}}
           />
           <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
         </Canvas>
@@ -228,9 +314,11 @@ const App: React.FC = () => {
         {/* HUD: modo de interação ( Factory I/O: mínimo, informativo ) */}
         <div className="sh-hud sh-hud-tl fz-mono">
           <Crosshair size={9} />
-          {fiaçãoDe
-            ? <span style={{ color: 'var(--warn)' }}>fiação: escolha o destino · Esc cancela</span>
-            : <span className="sh-hint">arraste p/ orbitar · clique na peça p/ inspecionar · clique no conector p/ ligar fio</span>}
+          {pendente
+            ? <span style={{ color: 'var(--acc)' }}>posicionando <b>{pendente}</b> · R gira · solte p/ criar</span>
+            : fiaçãoDe
+              ? <span style={{ color: 'var(--warn)' }}>fiação: escolha o destino · Esc cancela</span>
+              : <span className="sh-hint">arraste p/ orbitar · arraste da árvore p/ posicionar · arraste a alça p/ mover · clique no conector p/ ligar fio</span>}
         </div>
 
         {/* HUD: raio-X */}

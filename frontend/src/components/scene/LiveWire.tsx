@@ -22,18 +22,24 @@ interface LiveWireProps {
   active?: boolean     // sinal fluindo → pulsar
   gauge?: number       // bitola (0.5 fino → 2 grosso)
   label?: string
+  /** waypoints definidos pelo usuário (rota própria do fio) */
+  waypoints?: [number, number, number][]
 }
 
 export const LiveWire: React.FC<LiveWireProps> = ({
-  from, to, domain, active = true, gauge = 1, label
+  from, to, domain, active = true, gauge = 1, label, waypoints
 }) => {
   const color = DOMAIN_COLOR[domain]
   const radius = 0.02 * gauge
 
-  // Curva com "folga" (cabo não fica reto — tem sag realista)
+  // Curva: sem waypoints = sag natural; com = passa pelos pontos do usuário
   const curve = useMemo(() => {
     const start = new THREE.Vector3(...from)
     const end = new THREE.Vector3(...to)
+    if (waypoints && waypoints.length > 0) {
+      const pts = [start, ...waypoints.map(w => new THREE.Vector3(...w)), end]
+      return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.08)
+    }
     const mid = start.clone().add(end).multiplyScalar(0.5)
     const dist = start.distanceTo(end)
     mid.y -= Math.min(0.6, dist * 0.15)  // sag proporcional à distância
@@ -42,7 +48,7 @@ export const LiveWire: React.FC<LiveWireProps> = ({
       mid.add(new THREE.Vector3((Math.random() - 0.5) * 0.2, 0, (Math.random() - 0.5) * 0.2)),
       end
     )
-  }, [from, to])
+  }, [from, to, waypoints])
 
   const matRef = useRef<any>(null)
 

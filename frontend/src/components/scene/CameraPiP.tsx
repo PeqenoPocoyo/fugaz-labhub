@@ -128,6 +128,7 @@ export const CameraPiP: React.FC<CameraPiPProps> = ({
           onIniciarFiação={() => {}}
           onConectar={() => {}}
           onCancelarFiação={() => {}}
+          onRotaFio={() => {}}
         />
       </Canvas>
 
