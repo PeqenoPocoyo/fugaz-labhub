@@ -207,33 +207,62 @@ export type Parte =
 export interface Receita {
   id: string
   partes: Parte[]
+  /**
+   * Bornes: posição REAL de cada porta NA CARCAÇA do dispositivo
+   * (offset local). Estes pontos são enviados ao backend no spawn, de modo
+   * que os fios nasçam exatamente onde o borne está — não flutuando no ar.
+   */
+  portas?: Record<string, [number, number, number]>
 }
 
-/** Renderiza uma receita inteira */
-export const ModeloReceita: React.FC<{ receita: Receita }> = ({ receita }) => (
-  <group>
-    {receita.partes.map((p, i) => {
-      const k = `${receita.id}-p${i}`
-      switch (p.t) {
-        case 'rbox':
-          return <RBox key={k} size={p.size} pos={p.pos} rot={p.rot} mat={p.mat} cor={p.cor} radius={p.radius} />
-        case 'cil':
-          return <Cil key={k} raio={p.raio} comp={p.comp} pos={p.pos} rot={p.rot} mat={p.mat} cor={p.cor} />
-        case 'aletas':
-          return <Aletas key={k} count={p.count} eixo={p.eixo} comprimento={p.comp} altura={p.altura} pos={p.pos} mat={p.mat} cor={p.cor} />
-        case 'paraf':
-          return <ParafCircle key={k} count={p.count} raio={p.raio} comprimento={p.comp} pos={p.pos} mat={p.mat} cor={p.cor} />
-        case 'torno':
-          return <Torno key={k} perfil={p.perfil} pos={p.pos} rot={p.rot} mat={p.mat} cor={p.cor} />
-        case 'cabo':
-          return <Cabo key={k} pontos={p.pontos} raio={p.raio} mat={p.mat} cor={p.cor} />
-        case 'decal':
-          return <Decal key={k} texto={p.texto} largura={p.largura} pos={p.pos} rot={p.rot} corFundo={p.corFundo} corTexto={p.corTexto} fontePx={p.fontePx} />
-        default:
-          return null
-      }
-    })}
-  </group>
-)
+/** Renderiza uma receita inteira, incluindo os bornes na carcaça */
+export const ModeloReceita: React.FC<{
+  receita: Receita
+  mostrarBornes?: boolean
+  /** clique num borne (o conector físico é o elemento interativo) */
+  onPortClick?: (portId: string) => void
+  /** iniciar arraste de fio a partir de um borne */
+  onPortDown?: (portId: string) => void
+}> = ({ receita, mostrarBornes = true, onPortClick, onPortDown }) => {
+  const bornes = receita.portas ? Object.entries(receita.portas) : []
+  return (
+    <group>
+      {receita.partes.map((p, i) => {
+        const k = `${receita.id}-p${i}`
+        switch (p.t) {
+          case 'rbox':
+            return <RBox key={k} size={p.size} pos={p.pos} rot={p.rot} mat={p.mat} cor={p.cor} radius={p.radius} />
+          case 'cil':
+            return <Cil key={k} raio={p.raio} comp={p.comp} pos={p.pos} rot={p.rot} mat={p.mat} cor={p.cor} />
+          case 'aletas':
+            return <Aletas key={k} count={p.count} eixo={p.eixo} comprimento={p.comp} altura={p.altura} pos={p.pos} mat={p.mat} cor={p.cor} />
+          case 'paraf':
+            return <ParafCircle key={k} count={p.count} raio={p.raio} comprimento={p.comp} pos={p.pos} mat={p.mat} cor={p.cor} />
+          case 'torno':
+            return <Torno key={k} perfil={p.perfil} pos={p.pos} rot={p.rot} mat={p.mat} cor={p.cor} />
+          case 'cabo':
+            return <Cabo key={k} pontos={p.pontos} raio={p.raio} mat={p.mat} cor={p.cor} />
+          case 'decal':
+            return <Decal key={k} texto={p.texto} largura={p.largura} pos={p.pos} rot={p.rot} corFundo={p.corFundo} corTexto={p.corTexto} fontePx={p.fontePx} />
+          default:
+            return null
+        }
+      })}
+
+      {/* bornes fisicamente na carcaça — o conector É o elemento interativo */}
+      {mostrarBornes && bornes.map(([pid, pos]) => (
+        <mesh key={`borne-${pid}`} position={pos as [number, number, number]}
+          onClick={onPortClick ? (e) => { e.stopPropagation(); onPortClick(pid) } : undefined}
+          onPointerDown={onPortDown ? (e) => { e.stopPropagation(); onPortDown(pid) } : undefined}
+          onPointerOver={() => { if (onPortClick || onPortDown) document.body.style.cursor = 'crosshair' }}
+          onPointerOut={() => { document.body.style.cursor = '' }}
+        >
+          <cylinderGeometry args={[0.016, 0.018, 0.030, 8]} />
+          <meshStandardMaterial color="#8A94A6" metalness={0.85} roughness={0.25} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
 
 export default ModeloReceita

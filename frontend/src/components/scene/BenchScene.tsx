@@ -62,16 +62,23 @@ const RECIPE_TYPES = [
   'cylinder_pneumatic', 'valve_pneumatic_5_2', 'camera_ip',
   'clp_generic', 'vfd_generic',
   'infra_base_plate', 'infra_din_rail', 'infra_i_beam', 'infra_pillar', 'infra_profile_alu',
+  'sensor_capacitive', 'sensor_emergency_button', 'sensor_level', 'sensor_load_cell',
+  'cylinder_hydraulic', 'actuator_linear', 'pump_dosing', 'soft_starter', 'flange',
 ]
 
-const RecipeMesh: React.FC<{ obj: SceneObject; selected: boolean; onSelect: (id: string) => void }> = ({ obj, selected, onSelect }) => {
+const RecipeMesh: React.FC<{
+  obj: SceneObject; selected: boolean
+  onSelect: (id: string) => void
+  onPortDown?: (portId: string) => void
+  onPortClick?: (portId: string) => void
+}> = ({ obj, selected, onSelect, onPortDown, onPortClick }) => {
   const receita = receitaPara(obj.type_id || '', obj.properties)
   if (!receita) return null
   return (
-    <group position={obj.position}>
+    <group position={obj.position} rotation={obj.rotation}>
       {/* toda a peça é clicável (evento sobe das malhas filhas) */}
       <group onClick={(e) => { e.stopPropagation(); onSelect(obj.id) }}>
-        <ModeloReceita receita={receita} />
+        <ModeloReceita receita={receita} onPortDown={onPortDown} onPortClick={onPortClick} />
       </group>
       {/* etiqueta flutuante */}
       <Html position={[0, 0.45, 0]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
@@ -161,11 +168,13 @@ interface BenchSceneProps {
   onConectar: (alvo: string) => void
   onCancelarFiação: () => void
   onRotaFio: (connectionId: string, path: [number, number, number][]) => void
+  /** arrastar um borne do modelo (id do dispositivo, id da porta) */
+  onPortDownModelo: (deviceId: string, portId: string) => void
 }
 
 export const BenchScene: React.FC<BenchSceneProps> = ({
   objects, connections, slots, conduits, drivetrains, selectedId, fiaçãoDe,
-  onSelect, onIniciarFiação, onConectar, onCancelarFiação, onRotaFio,
+  onSelect, onIniciarFiação, onConectar, onCancelarFiação, onRotaFio, onPortDownModelo,
 }) => {
   const nodes = Object.entries(objects)
   const freeSlots = slots.filter(s => !s.occupied)
@@ -235,6 +244,7 @@ export const BenchScene: React.FC<BenchSceneProps> = ({
         onIniciarFiação={onIniciarFiação}
         onConectar={onConectar}
         onCancelar={onCancelarFiação}
+        bornesNoModelo
       />
 
       {/* Dispositivos — especializados têm malha própria */}
@@ -242,7 +252,19 @@ export const BenchScene: React.FC<BenchSceneProps> = ({
         const Special = obj.type_id ? SPECIALIZED[obj.type_id] : undefined
         if (Special) return <Special key={id} obj={obj} />
         if (obj.type_id && RECIPE_TYPES.includes(obj.type_id)) {
-          return <RecipeMesh key={id} obj={obj} selected={selectedId === id} onSelect={onSelect} />
+          return (
+            <RecipeMesh
+              key={id}
+              obj={obj}
+              selected={selectedId === id}
+              onSelect={onSelect}
+              onPortDown={(pid) => onPortDownModelo(id, pid)}
+              onPortClick={(pid) => {
+                const q = (obj.ports?.[pid] as any)?.qualified_id || `${id}_${pid}`
+                onIniciarFiação(q)
+              }}
+            />
+          )
         }
         return (
           <NodeMesh

@@ -148,7 +148,8 @@ class World:
     def next_slot_position(self) -> tuple:
         """Próxima posição livre em grade (evita sobreposição)."""
         cols = 6
-        spacing = 1.6
+        # modelos estão ~1.32× maiores; 2.2m mantém folga entre peças
+        spacing = 2.2
         idx = self._spawn_count
         self._spawn_count += 1
         x = ((idx % cols) - (cols - 1) / 2) * spacing

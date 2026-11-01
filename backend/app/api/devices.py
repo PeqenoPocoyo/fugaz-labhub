@@ -2,7 +2,7 @@
 API — Dispositivos
 """
 from fastapi import APIRouter, HTTPException
-from typing import List, Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel
 
 from app.main import state
@@ -16,6 +16,9 @@ class SpawnRequest(BaseModel):
     rotation: Optional[List[float]] = None   # yaw/pitch/roll em graus
     layer: Optional[str] = "devices"
     properties: Optional[dict] = None
+    # bornes declarados pelo modelo 3D (posição real na carcaça).
+    # Quando presentes, sobrescrevem o auto-layout — o fio nasce no borne.
+    port_anchors: Optional[Dict[str, List[float]]] = None
 
 
 class ModuleInstallRequest(BaseModel):
@@ -62,6 +65,11 @@ async def spawn_device(req: SpawnRequest):
 
     if req.rotation is not None and len(req.rotation) == 3:
         device.transform.rotation = tuple(req.rotation)
+
+    # bornes do modelo 3D (posição real na carcaça) têm prioridade sobre
+    # o auto-layout — é o que faz o fio começar exatamente no conector
+    if req.port_anchors:
+        device.port_anchors = {k: tuple(v) for k, v in req.port_anchors.items()}
     if req.properties:
         device.properties.update(req.properties)
 

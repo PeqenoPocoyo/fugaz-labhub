@@ -6,7 +6,106 @@
 // Convenção: origem no centro do dispositivo. +Y para cima, +Z frente.
 // Escala em METROS.
 
-import type { Receita } from './ModelKit'
+import type { Receita, Parte } from './ModelKit'
+
+/**
+ * ESCALA DOS MODELOS — os dispositivos ficam um pouco maiores para que os
+ * bornes se afastem entre si (menos cruzamento de fio) e as peças tenham
+ * presença na cena. Aplica-se a partes E a bornes, de forma que o borne
+ * continue exatamente sobre a carcaça.
+ */
+const ESCALA = 1.32
+
+/** escala uma parte (posições, tamanhos, raios) */
+function escalar(p: Parte): Parte {
+  const s = (n: number) => n * ESCALA
+  const v = (a: [number, number, number]): [number, number, number] => [s(a[0]), s(a[1]), s(a[2])]
+  switch (p.t) {
+    case 'rbox':  return { ...p, size: v(p.size) as any, pos: p.pos ? v(p.pos) : p.pos }
+    case 'cil':   return { ...p, raio: s(p.raio ?? 0), comp: s(p.comp ?? 0), pos: p.pos ? v(p.pos) : p.pos }
+    case 'aletas':return { ...p, comp: s(p.comp), altura: s(p.altura), pos: p.pos ? v(p.pos) : p.pos }
+    case 'paraf': return { ...p, raio: s(p.raio), comp: s(p.comp), pos: p.pos ? v(p.pos) : p.pos }
+    case 'torno': return { ...p, perfil: p.perfil.map(([x, y]) => [s(x), s(y)] as [number, number]),
+                            pos: p.pos ? v(p.pos) : p.pos }
+    case 'cabo':  return { ...p, raio: p.raio != null ? s(p.raio) : p.raio, pontos: p.pontos.map(v) as any }
+    case 'decal': return { ...p, largura: s(p.largura), pos: p.pos ? v(p.pos) : p.pos }
+    default: return p
+  }
+}
+
+/**
+ * BORNES NA CARCAÇA — posição real de cada porta no corpo do dispositivo.
+ * Unidades em METROS, na escala de autoria (antes do fator ESCALA).
+ * O borne nasce fisicamente sobre estes pontos (ver ModeloReceita) e o
+ * backend recebe as mesmas coordenadas no spawn, então o fio começa no borne.
+ */
+const PORTAS: Record<string, Record<string, [number, number, number]>> = {
+  motor_ac: {
+    l1: [-0.070, 0.257, 0.083], l2: [-0.035, 0.257, 0.083], l3: [0, 0.257, 0.083],
+    start: [0.035, 0.257, 0.083], stop: [0.070, 0.257, 0.083],
+  },
+  motor_stepper: {
+    'a+': [-0.128, 0.115, 0.045], 'a-': [-0.128, 0.115, 0.015],
+    'b+': [-0.128, 0.115, -0.015], 'b-': [-0.128, 0.115, -0.045],
+    step: [-0.128, 0.065, 0.020], dir: [-0.128, 0.065, -0.020],
+    home: [0.090, 0, 0],
+  },
+  motor_servo: {
+    pwr: [-0.120, -0.075, 0.020], cmd: [-0.120, -0.075, -0.020],
+    fb: [-0.060, 0.090, 0], ready: [0.000, 0.088, 0],
+  },
+  sensor_photoelectric: {
+    pwr: [-0.132, 0.014, 0.006], test: [-0.132, 0.014, -0.006], out: [-0.132, -0.010, 0],
+  },
+  sensor_photoelectric_receptor: {
+    pwr: [-0.132, 0.014, 0.006], out: [-0.132, -0.010, 0], align_cmd: [-0.132, 0.014, -0.006],
+  },
+  sensor_inductive: { pwr: [-0.092, 0.009, 0], out: [-0.092, -0.009, 0] },
+  sensor_limit_switch: { nc: [-0.062, -0.008, 0.022], no: [-0.062, -0.008, -0.022] },
+  sensor_temperature: { pwr: [-0.128, 0.009, 0], out: [-0.128, -0.009, 0] },
+  sensor_pressure: { pwr: [0, 0, -0.056], out: [0, -0.02, -0.056] },
+  sensor_encoder: {
+    pwr: [-0.072, 0.022, 0.012], ch_a: [-0.072, 0.022, -0.012],
+    ch_b: [-0.072, -0.012, 0.012], ch_z: [-0.072, -0.012, -0.012],
+  },
+  cylinder_pneumatic: {
+    port_a: [-0.130, 0.086, 0.015], port_b: [0.130, 0.086, 0.015],
+    valve_a: [-0.130, 0.086, -0.015], valve_b: [0.130, 0.086, -0.015],
+    sensor_front: [0.146, 0, 0], sensor_back: [-0.146, 0, 0],
+  },
+  valve_pneumatic_5_2: {
+    p: [-0.090, -0.058, 0], a: [0, -0.058, 0], b: [0.090, -0.058, 0],
+    ea: [-0.126, 0, 0], eb: [0.126, 0, 0],
+    coil_a: [-0.060, 0.112, 0], coil_b: [0.060, 0.112, 0],
+  },
+  camera_ip: {
+    poe: [-0.082, 0.010, 0], eth0: [-0.082, -0.010, 0],
+    detect: [-0.03, 0.042, 0.022], count: [0, 0.042, 0.022],
+    pos_x: [0.03, 0.042, 0.022], pos_y: [0.03, 0.042, -0.022],
+  },
+  clp_generic: { eth0: [0, 0, -0.076] },
+  vfd_generic: {
+    l1: [-0.070, -0.215, 0.046], l2: [0, -0.215, 0.046], l3: [0.070, -0.215, 0.046],
+    u: [-0.070, -0.215, -0.046], v: [0, -0.215, -0.046], w: [0.070, -0.215, -0.046],
+    di_start: [0.108, 0.030, 0.106], di_stop: [0.108, 0.008, 0.106],
+    di_fwd: [0.108, -0.014, 0.106], di_rev: [0.108, -0.036, 0.106],
+    di_reset: [0.108, -0.058, 0.106], di_fault: [0.108, -0.080, 0.106],
+    ai_speed: [0.108, -0.102, 0.106],
+    do_run: [-0.108, 0.030, 0.106], do_fault: [-0.108, 0.008, 0.106],
+    do_ready: [-0.108, -0.014, 0.106], ao_freq: [-0.108, -0.036, 0.106],
+    rs485: [0, -0.150, -0.106],
+  },
+}
+
+/** aplica escala + converte bornes para a escala do mundo */
+function pronta(r: Receita): Receita {
+  const fonte = r.portas ?? PORTAS[r.id] ?? {}
+  const portas: Record<string, [number, number, number]> = {}
+  for (const [k, p] of Object.entries(fonte)) {
+    portas[k] = [p[0] * ESCALA, p[1] * ESCALA, p[2] * ESCALA]
+  }
+  return { id: r.id, partes: r.partes.map(escalar), portas }
+}
 
 // ============================================================
 // MOTOR DC — padrão pé, eixo horizontal (tipo IEC 90)
@@ -49,6 +148,13 @@ function motorDC(): Receita {
       // --- ventilador traseiro (grade) ---
       { t: 'cil', raio: 0.07, comp: 0.012, pos: [-corpoX / 2 - 0.04, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'plastico' },
     ],
+    // bornes na face da caixa de ligação (carcaça — não flutuando)
+    portas: {
+      'v+':  [-0.06, 0.235, 0.078],
+      'v-':  [-0.02, 0.235, 0.078],
+      'pwm': [0.02, 0.235, 0.078],
+      'dir': [0.06, 0.235, 0.078],
+    },
   }
 }
 
@@ -483,43 +589,265 @@ function perfilAluminio(comprimento = 1.0): Receita {
 }
 
 // ============================================================
+// LOTE 3 — fecha o catálogo modelável
+// ============================================================
+
+function sensorCapacitivo(): Receita {
+  return {
+    id: 'sensor_capacitive',
+    partes: [
+      // corpo rosqueado (mais gordo que o indutivo)
+      { t: 'cil', raio: 0.034, comp: 0.10, pos: [0, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoEscovado' },
+      { t: 'cil', raio: 0.036, comp: 0.005, pos: [0.028, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'aluminio' },
+      { t: 'cil', raio: 0.036, comp: 0.005, pos: [-0.012, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'aluminio' },
+      { t: 'cil', raio: 0.044, comp: 0.012, pos: [0.046, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'latao' },
+      { t: 'cil', raio: 0.031, comp: 0.006, pos: [0.056, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'plastico', cor: '#0B0E13' },
+      { t: 'cil', raio: 0.015, comp: 0.032, pos: [-0.064, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'borracha' },
+      { t: 'cil', raio: 0.010, comp: 0.022, pos: [-0.088, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'borracha' },
+      { t: 'cil', raio: 0.005, comp: 0.005, pos: [0, 0.034, 0], mat: 'plastico', cor: '#42A5F5' },
+      { t: 'decal', texto: 'M18', largura: 0.018, pos: [0, 0.038, 0], rot: [0, 0, 0], fontePx: 14 },
+    ],
+    portas: { pwr: [-0.099, 0.010, 0], out: [-0.099, -0.010, 0] },
+  }
+}
+
+function botaoEmergencia(): Receita {
+  return {
+    id: 'sensor_emergency_button',
+    partes: [
+      // base de montagem (painel)
+      { t: 'cil', raio: 0.048, comp: 0.02, pos: [0, 0, 0], rot: [Math.PI / 2, 0, 0], mat: 'acoPintado' },
+      // colarinho amarelo (identidade do cogumelo)
+      { t: 'cil', raio: 0.056, comp: 0.03, pos: [0, 0.024, 0], rot: [Math.PI / 2, 0, 0], mat: 'plastico', cor: '#F2C200' },
+      // botão vermelho
+      { t: 'cil', raio: 0.048, comp: 0.04, pos: [0, 0.056, 0], rot: [Math.PI / 2, 0, 0], mat: 'plastico', cor: '#D32F2F' },
+      // bornes atrás
+      { t: 'cil', raio: 0.006, comp: 0.05, pos: [0, 0.01, 0.045], rot: [Math.PI / 2, 0, 0], mat: 'latao' },
+      { t: 'cil', raio: 0.006, comp: 0.05, pos: [0, 0.01, -0.045], rot: [Math.PI / 2, 0, 0], mat: 'latao' },
+      { t: 'decal', texto: 'STOP', largura: 0.05, pos: [0, -0.021, 0.056], rot: [0, 0, 0], fontePx: 14 },
+    ],
+    portas: { nc: [0, -0.005, -0.058], no: [0, -0.005, 0.058] },
+  }
+}
+
+function sensorNivel(): Receita {
+  return {
+    id: 'sensor_level',
+    partes: [
+      // cabeça
+      { t: 'rbox', size: [0.09, 0.10, 0.09], pos: [0, 0, 0], mat: 'plastico', radius: 0.008 },
+      { t: 'decal', texto: 'LVL', largura: 0.045, pos: [0, 0.02, 0.046], rot: [0, 0, 0], fontePx: 14 },
+      // sonda longa (vai no tanque)
+      { t: 'cil', raio: 0.010, comp: 0.55, pos: [0, -0.345, 0], mat: 'acoPolido' },
+      { t: 'cil', raio: 0.014, comp: 0.05, pos: [0, -0.062, 0], mat: 'acoEscovado' },
+      // prensa-cabo
+      { t: 'cil', raio: 0.011, comp: 0.03, pos: [-0.055, 0.005, 0], rot: [0, 0, Math.PI / 2], mat: 'borracha' },
+      { t: 'cil', raio: 0.008, comp: 0.022, pos: [-0.08, 0.005, 0], rot: [0, 0, Math.PI / 2], mat: 'borracha' },
+      { t: 'cil', raio: 0.004, comp: 0.004, pos: [0.04, 0.045, 0.045], mat: 'plastico', cor: '#3FB950' },
+    ],
+    portas: { pwr: [-0.091, 0.012, 0], out: [-0.091, -0.008, 0] },
+  }
+}
+
+function celulaDeCarga(): Receita {
+  return {
+    id: 'sensor_load_cell',
+    partes: [
+      // bloco de aço (base de carga)
+      { t: 'rbox', size: [0.16, 0.05, 0.10], pos: [0, -0.03, 0], mat: 'acoEscovado', radius: 0.006 },
+      // furos de fixação
+      { t: 'cil', raio: 0.010, comp: 0.06, pos: [-0.06, -0.03, 0.035], rot: [0, 0, 0], mat: 'plastico', cor: '#0B0E13' },
+      { t: 'cil', raio: 0.010, comp: 0.06, pos: [0.06, -0.03, 0.035], rot: [0, 0, 0], mat: 'plastico', cor: '#0B0E13' },
+      // strain gauges (colados no bloco)
+      { t: 'rbox', size: [0.03, 0.002, 0.05], pos: [-0.035, 0.001, 0], mat: 'plastico', cor: '#1B5E20', radius: 0.001 },
+      { t: 'rbox', size: [0.03, 0.002, 0.05], pos: [0.035, 0.001, 0], mat: 'plastico', cor: '#1B5E20', radius: 0.001 },
+      // cabo do sensor
+      { t: 'cil', raio: 0.008, comp: 0.06, pos: [0, 0.02, 0], rot: [0, Math.PI / 2, 0], mat: 'borracha' },
+      { t: 'decal', texto: '50kg', largura: 0.05, pos: [0, -0.004, 0.052], rot: [0, 0, 0], fontePx: 14 },
+    ],
+    portas: { exc: [0.035, 0.02, 0], out: [0, 0.02, 0] },
+  }
+}
+
+function cilindroHidraulico(): Receita {
+  return {
+    id: 'cylinder_hidraulic',
+    partes: [
+      // camisa de aço (mais reforçada que a pneumática)
+      { t: 'torno', perfil: [[0.001, -0.16], [0.062, -0.16], [0.068, -0.13], [0.068, 0.13], [0.062, 0.16], [0.001, 0.16]],
+        pos: [0, 0, 0], rot: [Math.PI / 2, 0, 0], mat: 'acoEscovado' },
+      { t: 'torno', perfil: [[0.001, -0.07], [0.070, -0.07], [0.075, -0.05], [0.075, 0.05], [0.070, 0.07], [0.001, 0.07]],
+        pos: [-0.16, 0, 0], rot: [Math.PI / 2, 0, 0], mat: 'acoPintado' },
+      { t: 'torno', perfil: [[0.001, -0.07], [0.070, -0.07], [0.075, -0.05], [0.075, 0.05], [0.070, 0.07], [0.001, 0.07]],
+        pos: [0.16, 0, 0], rot: [Math.PI / 2, 0, 0], mat: 'acoPintado' },
+      // haste cromada
+      { t: 'cil', raio: 0.022, comp: 0.30, pos: [0.31, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoPolido' },
+      // conexões hidráulicas (maiores)
+      { t: 'cil', raio: 0.014, comp: 0.05, pos: [-0.16, 0.075, 0], mat: 'latao' },
+      { t: 'cil', raio: 0.014, comp: 0.05, pos: [0.16, 0.075, 0], mat: 'latao' },
+      { t: 'paraf', count: 4, raio: 0.055, comp: 0.01, pos: [-0.165, 0, 0], mat: 'latao' },
+      { t: 'decal', texto: '80/20', largura: 0.08, pos: [0, 0.085, 0], rot: [Math.PI / 2, 0, 0], fontePx: 14 },
+    ],
+    portas: {
+      port_a: [-0.16, 0.100, 0.015], port_b: [0.16, 0.100, 0.015],
+      valve_a: [-0.16, 0.100, -0.015], valve_b: [0.16, 0.100, -0.015],
+      sensor_front: [0.166, 0, 0], sensor_back: [-0.166, 0, 0],
+    },
+  }
+}
+
+function atuadorLinear(): Receita {
+  return {
+    id: 'actuator_linear',
+    partes: [
+      // corpo do atuador
+      { t: 'cil', raio: 0.05, comp: 0.34, pos: [-0.10, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoEscovado' },
+      // tampa traseira com conector
+      { t: 'cil', raio: 0.055, comp: 0.02, pos: [-0.29, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoPintado' },
+      // haste
+      { t: 'cil', raio: 0.014, comp: 0.26, pos: [0.16, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoPolido' },
+      // terminal dianteiro (olhal)
+      { t: 'cil', raio: 0.026, comp: 0.008, pos: [0.30, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoEscovado' },
+      { t: 'cil', raio: 0.008, comp: 0.008, pos: [0.30, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'plastico', cor: '#0B0E13' },
+      // caixa de comando no topo
+      { t: 'rbox', size: [0.12, 0.06, 0.08], pos: [-0.10, 0.055, 0], mat: 'acoPintado', radius: 0.006 },
+      { t: 'decal', texto: 'LA', largura: 0.04, pos: [-0.10, 0.085, 0], rot: [Math.PI / 2, 0, 0], fontePx: 12 },
+    ],
+    portas: {
+      'v+': [-0.29, 0.02, 0.02], 'v-': [-0.29, 0.02, -0.02],
+      extend: [-0.10, 0.090, 0.02], retract: [-0.10, 0.090, -0.02],
+      position_cmd: [0.02, 0.090, 0.01],
+    },
+  }
+}
+
+function bombaDosadora(): Receita {
+  return {
+    id: 'pump_dosing',
+    partes: [
+      // cabeça de dosagem (onde se vê o diafragma)
+      { t: 'cil', raio: 0.055, comp: 0.07, pos: [0.045, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoPintado' },
+      // corpo do diafragma
+      { t: 'cil', raio: 0.07, comp: 0.05, pos: [-0.01, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoEscovado' },
+      // motor elétrico atrás
+      { t: 'cil', raio: 0.055, comp: 0.16, pos: [-0.13, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoPintado' },
+      // conexões de sucção/injeção
+      { t: 'cil', raio: 0.012, comp: 0.06, pos: [0.05, 0.065, 0], rot: [0, Math.PI / 2, 0], mat: 'plastico', cor: '#26A69A' },
+      { t: 'cil', raio: 0.012, comp: 0.06, pos: [0.05, -0.065, 0], rot: [0, Math.PI / 2, 0], mat: 'plastico', cor: '#26A69A' },
+      // painel de controle
+      { t: 'rbox', size: [0.06, 0.09, 0.03], pos: [-0.05, 0.075, 0], mat: 'plastico', radius: 0.004 },
+      { t: 'decal', texto: 'mL/m', largura: 0.03, pos: [-0.05, 0.075, 0.016], rot: [0, 0, 0], fontePx: 12 },
+    ],
+    portas: {
+      run: [-0.05, 0.122, 0.012], rate_cmd: [-0.05, 0.122, -0.012],
+      fluid_in: [0.05, -0.097, 0], fluid_out: [0.05, 0.097, 0],
+    },
+  }
+}
+
+function softStarter(): Receita {
+  return {
+    id: 'soft_starter',
+    partes: [
+      // corpo (montado em painel como o VFD, mas sem display)
+      { t: 'rbox', size: [0.22, 0.32, 0.18], pos: [0, 0, 0], mat: 'acoPintado', radius: 0.01 },
+      { t: 'rbox', size: [0.21, 0.31, 0.006], pos: [0, 0, 0.091], mat: 'acoEscovado', radius: 0.004 },
+      { t: 'decal', texto: 'SOFT', largura: 0.07, pos: [0, 0.09, 0.094] },
+      // potenciômetro de rampa
+      { t: 'cil', raio: 0.022, comp: 0.014, pos: [0, -0.04, 0.096], rot: [Math.PI / 2, 0, 0], mat: 'plastico', cor: '#1C222B' },
+      // LEDs
+      { t: 'cil', raio: 0.005, comp: 0.006, pos: [-0.06, -0.11, 0.096], mat: 'plastico', cor: '#3FB950' },
+      { t: 'cil', raio: 0.005, comp: 0.006, pos: [-0.04, -0.11, 0.096], mat: 'plastico', cor: '#D29922' },
+      // aletas atrás
+      { t: 'aletas', count: 10, eixo: 'y', comp: 0.26, altura: 0.15, pos: [0, 0, -0.10], mat: 'aluminio' },
+      // bornes de potência + controle
+      { t: 'rbox', size: [0.18, 0.04, 0.08], pos: [0, -0.18, 0], mat: 'plastico', radius: 0.003 },
+      { t: 'paraf', count: 6, raio: 0.06, comp: 0.01, pos: [0, -0.201, 0], mat: 'latao' },
+      { t: 'rbox', size: [0.03, 0.34, 0.03], pos: [0.115, 0, 0.08], mat: 'acoEscovado', radius: 0.003 },
+      { t: 'rbox', size: [0.03, 0.34, 0.03], pos: [-0.115, 0, 0.08], mat: 'acoEscovado', radius: 0.003 },
+    ],
+    portas: {
+      l1: [-0.055, -0.202, 0.030], l2: [0, -0.202, 0.030], l3: [0.055, -0.202, 0.030],
+      start: [0, 0.020, 0.100], stop: [0, -0.010, 0.100],
+      run: [-0.04, 0.14, 0.096], bypass: [0.03, 0.14, 0.096],
+    },
+  }
+}
+
+function flange(): Receita {
+  return {
+    id: 'flange',
+    partes: [
+      // disco dos dois lados
+      { t: 'cil', raio: 0.075, comp: 0.012, pos: [-0.008, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoEscovado' },
+      { t: 'cil', raio: 0.075, comp: 0.012, pos: [0.008, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoEscovado' },
+      // tubo de passagem
+      { t: 'cil', raio: 0.038, comp: 0.05, pos: [0, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoPintado' },
+      // parafusos do círculo
+      { t: 'paraf', count: 4, raio: 0.058, comp: 0.014, pos: [-0.014, 0, 0], mat: 'latao' },
+      { t: 'paraf', count: 4, raio: 0.058, comp: 0.014, pos: [0.014, 0, 0], mat: 'latao' },
+    ],
+    portas: { fluid_a: [-0.026, 0, 0], fluid_b: [0.026, 0, 0] },
+  }
+}
+
+// ============================================================
 // CATÁLOGO
 // ============================================================
 
 export const RECEITAS: Record<string, Receita> = {
-  motor_dc: motorDC(),
-  motor_ac: motorAC(),
-  motor_stepper: motorStepper(),
-  motor_servo: motorServo(),
-  sensor_photoelectric: sensorFotoeletrico(),
-  sensor_photoelectric_receptor: receptorFotoeletrico(),
-  sensor_inductive: sensorIndutivo(),
-  sensor_limit_switch: chaveFimDeCurso(),
-  sensor_temperature: sensorTemperatura(),
-  sensor_pressure: sensorPressao(),
-  sensor_encoder: encoder(),
-  cylinder_pneumatic: cilindroPneumatico(),
-  valve_pneumatic_5_2: valvula52(),
-  camera_ip: camera(),
-  clp_generic: clp(),
-  vfd_generic: vfd(),
-  infra_base_plate: basePlana(),
-  infra_din_rail: dinRail(),
-  infra_i_beam: vigaI(),
-  infra_pillar: pilar(),
-  infra_profile_alu: perfilAluminio(),
+  motor_dc: pronta(motorDC()),
+  motor_ac: pronta(motorAC()),
+  motor_stepper: pronta(motorStepper()),
+  motor_servo: pronta(motorServo()),
+  sensor_photoelectric: pronta(sensorFotoeletrico()),
+  sensor_photoelectric_receptor: pronta(receptorFotoeletrico()),
+  sensor_inductive: pronta(sensorIndutivo()),
+  sensor_limit_switch: pronta(chaveFimDeCurso()),
+  sensor_temperature: pronta(sensorTemperatura()),
+  sensor_pressure: pronta(sensorPressao()),
+  sensor_encoder: pronta(encoder()),
+  cylinder_pneumatic: pronta(cilindroPneumatico()),
+  valve_pneumatic_5_2: pronta(valvula52()),
+  camera_ip: pronta(camera()),
+  clp_generic: pronta(clp()),
+  vfd_generic: pronta(vfd()),
+  infra_base_plate: pronta(basePlana()),
+  infra_din_rail: pronta(dinRail()),
+  infra_i_beam: pronta(vigaI()),
+  infra_pillar: pronta(pilar()),
+  infra_profile_alu: pronta(perfilAluminio()),
+  sensor_capacitive: pronta(sensorCapacitivo()),
+  sensor_emergency_button: pronta(botaoEmergencia()),
+  sensor_level: pronta(sensorNivel()),
+  sensor_load_cell: pronta(celulaDeCarga()),
+  cylinder_hydraulic: pronta(cilindroHidraulico()),
+  actuator_linear: pronta(atuadorLinear()),
+  pump_dosing: pronta(bombaDosadora()),
+  soft_starter: pronta(softStarter()),
+  flange: pronta(flange()),
+}
+
+/** bornes (já escalados) de um tipo — usados no spawn para o backend */
+export function bornesDe(typeId: string): Record<string, [number, number, number]> {
+  return RECEITAS[typeId]?.portas ?? {}
 }
 
 /** Receitas paramétricas: recalculadas a partir das propriedades do dispositivo */
 export function receitaPara(typeId: string, properties: Record<string, any> = {}): Receita | null {
   if (typeId === 'infra_base_plate') {
-    return basePlana(
+    const r = basePlana(
       Number(properties.cols ?? 4),
       Number(properties.rows ?? 3),
       Number(properties.spacing_m ?? 1.0),
       Number(properties.thickness_mm ?? 10) / 1000,
     )
+    return pronta(r)
   }
+  if (typeId === 'infra_din_rail') return pronta(dinRail(Number(properties.length_m ?? 1.0)))
+  if (typeId === 'infra_i_beam') return pronta(vigaI(Number(properties.length_m ?? 4.0)))
+  if (typeId === 'infra_pillar') return pronta(pilar(Number(properties.height_m ?? 2.5)))
+  if (typeId === 'infra_profile_alu') return pronta(perfilAluminio(Number(properties.length_m ?? 1.0)))
   return RECEITAS[typeId] ?? null
 }
 

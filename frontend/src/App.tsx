@@ -14,6 +14,7 @@ import { Inspector } from './components/shell/Inspector'
 import { BenchScene } from './components/scene/BenchScene'
 import { Placement } from './components/scene/Placement'
 import { FrameController } from './components/scene/FrameController'
+import { bornesDe } from './components/scene/recipes'
 import { CameraPiP } from './components/scene/CameraPiP'
 import { CommandPalette } from './components/command/CommandPalette'
 import DiagnosisConsole from './components/diagnostics/DiagnosisConsole'
@@ -64,7 +65,7 @@ const App: React.FC = () => {
     try {
       const r = await fetch('/api/devices/spawn', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type_id: typeId }),
+        body: JSON.stringify({ type_id: typeId, port_anchors: bornesDe(typeId) }),
       })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const d = await r.json()
@@ -93,6 +94,7 @@ const App: React.FC = () => {
           type_id: typeId,
           position: pos,
           rotation: [THREE.MathUtils.radToDeg(rotY), 0, 0],
+          port_anchors: bornesDe(typeId),
         }),
       })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -145,6 +147,12 @@ const App: React.FC = () => {
       push({ severity: 'error', title: 'Não conectou', source: 'wire', detail: String(e?.message || e) })
       addLog('error', 'wire', `Falha ao conectar: ${String(e?.message || e)}`)
     }
+  }
+
+  // arrastar um borne do modelo → inicia a fiação por aquela porta
+  const handlePortDownModelo = (deviceId: string, portId: string) => {
+    const q = (objects[deviceId]?.ports?.[portId] as any)?.qualified_id || `${deviceId}_${portId}`
+    setFiaçãoDe(q)
   }
 
   // commit da rota de um fio (arrastar e puxar)
@@ -306,6 +314,7 @@ const App: React.FC = () => {
             onConectar={handleConectar}
             onCancelarFiação={() => setFiaçãoDe(null)}
             onRotaFio={handleRotaFio}
+            onPortDownModelo={handlePortDownModelo}
           />
           {/* posicionamento: fantasma ao arrastar da árvore + mover selecionado */}
           <Placement
@@ -327,7 +336,7 @@ const App: React.FC = () => {
             ? <span style={{ color: 'var(--acc)' }}>posicionando <b>{pendente}</b> · R gira · solte p/ criar</span>
             : fiaçãoDe
               ? <span style={{ color: 'var(--warn)' }}>fiação: escolha o destino · Esc cancela</span>
-              : <span className="sh-hint">arraste p/ orbitar · arraste da árvore p/ posicionar · alça move (Shift=gira, Ctrl=eleva) · R gira · [ ] altura · Home enquadra</span>}
+              : <span className="sh-hint">arraste p/ orbitar · arraste da árvore p/ posicionar · alça move (Shift=gira, Ctrl=eleva) · <b style={{color:'var(--tx-mut)'}}>borne: arraste p/ ligar fio</b> · Home enquadra</span>}
         </div>
 
         {/* HUD: raio-X */}

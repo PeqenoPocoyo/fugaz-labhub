@@ -27,6 +27,10 @@ RECEITAS_FRONTEND = {
     # infraestrutura
     "infra_base_plate", "infra_din_rail", "infra_i_beam", "infra_pillar",
     "infra_profile_alu",
+    # lote 3
+    "sensor_capacitive", "sensor_emergency_button", "sensor_level",
+    "sensor_load_cell", "cylinder_hydraulic", "actuator_linear",
+    "pump_dosing", "soft_starter", "flange",
 }
 
 CAT_LABEL = {

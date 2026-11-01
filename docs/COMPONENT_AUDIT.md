@@ -16,13 +16,13 @@
 | `sensor_photoelectric` | Sensor Fotoelétrico | 3 | 3 | ✅ | 1 | ✅ receita |
 | `sensor_photoelectric_receptor` | Receptor Fotoelétrico | 3 | 3 | ✅ | 1 | ✅ receita |
 | `sensor_inductive` | Sensor Indutivo | 2 | 2 | ✅ | 1 | ✅ receita |
-| `sensor_capacitive` | Sensor Capacitivo | 2 | 2 | ❌ | 1 | ❌ bloco |
+| `sensor_capacitive` | Sensor Capacitivo | 2 | 2 | ❌ | 1 | ✅ receita |
 | `sensor_limit_switch` | Chave Fim de Curso | 2 | 2 | ❌ | 1 | ✅ receita |
-| `sensor_emergency_button` | Botão de Emergência | 2 | 2 | ❌ | 1 | ❌ bloco |
+| `sensor_emergency_button` | Botão de Emergência | 2 | 2 | ❌ | 1 | ✅ receita |
 | `sensor_temperature` | Sensor de Temperatura | 2 | 2 | ❌ | 1 | ✅ receita |
 | `sensor_pressure` | Sensor de Pressão | 2 | 2 | ❌ | 1 | ✅ receita |
-| `sensor_level` | Sensor de Nível | 2 | 2 | ❌ | 1 | ❌ bloco |
-| `sensor_load_cell` | Célula de Carga | 2 | 2 | ❌ | 1 | ❌ bloco |
+| `sensor_level` | Sensor de Nível | 2 | 2 | ❌ | 1 | ✅ receita |
+| `sensor_load_cell` | Célula de Carga | 2 | 2 | ❌ | 1 | ✅ receita |
 | `sensor_encoder` | Encoder | 4 | 4 | ❌ | 1 | ✅ receita |
 | `flow_vortex` | Medidor de Vazão Vortex | 5 | 5 | ✅ | 1 | ❌ bloco |
 
@@ -36,12 +36,12 @@
 | `motor_servo` | Motor Servo | 4 | 4 | ✅ | 1 | ✅ receita |
 | `cylinder_pneumatic` | Cilindro Pneumático | 6 | 6 | ✅ | 1 | ✅ receita |
 | `valve_pneumatic_5_2` | Válvula 5/2 | 7 | 7 | ❌ | 1 | ✅ receita |
-| `cylinder_hydraulic` | Cilindro Hidráulico | 6 | 6 | ❌ | 1 | ❌ bloco |
-| `actuator_linear` | Atuador Linear | 6 | 6 | ❌ | 1 | ❌ bloco |
+| `cylinder_hydraulic` | Cilindro Hidráulico | 6 | 6 | ❌ | 1 | ✅ receita |
+| `actuator_linear` | Atuador Linear | 6 | 6 | ❌ | 1 | ✅ receita |
 | `conveyor_belt` | Esteira de Correia | 11 | 11 | ✅ | 1 | ❌ bloco |
 | `conveyor_roller` | Esteira de Rolos | 8 | 8 | ✅ | 1 | ❌ bloco |
 | `pump_centrifugal` | Motobomba Centrífuga | 5 | 5 | ✅ | 1 | ❌ bloco |
-| `pump_dosing` | Bomba Dosadora | 5 | 5 | ✅ | 1 | ❌ bloco |
+| `pump_dosing` | Bomba Dosadora | 5 | 5 | ✅ | 1 | ✅ receita |
 | `valve_control` | Válvula de Controle | 4 | 4 | ❌ | 1 | ❌ bloco |
 
 ## Drives (2)
@@ -49,7 +49,7 @@
 | Tipo | Nome | Portas | Âncoras | Fixação | Comportamento | Modelo |
 |---|---|---|---|---|---|---|
 | `vfd_generic` | Inversor de Frequência | 18 | 18 | ✅ | 1 | ✅ receita |
-| `soft_starter` | Soft Starter | 7 | 7 | ❌ | 1 | ❌ bloco |
+| `soft_starter` | Soft Starter | 7 | 7 | ❌ | 1 | ✅ receita |
 
 ## Transmissões (6)
 
@@ -84,13 +84,13 @@
 | `infra_conduit` | Eletroduto | 0 | 0 | — | 0 | — passivo |
 | `infra_cable_tray` | Calha de Cabos | 0 | 0 | — | 0 | — passivo |
 | `duct` | Duto Escalável | 2 | 2 | ✅ | 1 | ❌ bloco |
-| `flange` | Flange | 2 | 2 | ✅ | 1 | ❌ bloco |
+| `flange` | Flange | 2 | 2 | ✅ | 1 | ✅ receita |
 | `tank` | Tanque | 4 | 4 | ✅ | 1 | ❌ bloco |
 
 ## Resumo
 
 - **Tipos no catálogo:** 49
-- **Com modelo (receita):** 21
+- **Com modelo (receita):** 30
 - **Sem portas (passivos):** 11
 - **Sem ponto de fixação (não-infra):** 18
 - **Sem comportamento por tick:** 11
