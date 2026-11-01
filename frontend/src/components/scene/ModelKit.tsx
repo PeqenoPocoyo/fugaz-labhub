@@ -202,7 +202,7 @@ export type Parte =
   | { t: 'paraf'; count: number; raio: number; comp: number; pos?: any; mat?: MatName; cor?: string }
   | { t: 'torno'; perfil: [number, number][]; pos?: any; rot?: any; mat?: MatName; cor?: string }
   | { t: 'cabo'; pontos: [number, number, number][]; raio?: number; mat?: MatName; cor?: string }
-  | { t: 'decal'; texto: string; largura: number; pos?: any; rot?: any; corFundo?: string; corTexto?: string }
+  | { t: 'decal'; texto: string; largura: number; pos?: any; rot?: any; corFundo?: string; corTexto?: string; fontePx?: number }
 
 export interface Receita {
   id: string
@@ -228,7 +228,7 @@ export const ModeloReceita: React.FC<{ receita: Receita }> = ({ receita }) => (
         case 'cabo':
           return <Cabo key={k} pontos={p.pontos} raio={p.raio} mat={p.mat} cor={p.cor} />
         case 'decal':
-          return <Decal key={k} texto={p.texto} largura={p.largura} pos={p.pos} rot={p.rot} corFundo={p.corFundo} corTexto={p.corTexto} />
+          return <Decal key={k} texto={p.texto} largura={p.largura} pos={p.pos} rot={p.rot} corFundo={p.corFundo} corTexto={p.corTexto} fontePx={p.fontePx} />
         default:
           return null
       }

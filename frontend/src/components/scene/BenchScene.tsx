@@ -55,7 +55,14 @@ const SPECIALIZED: Record<string, React.FC<{ obj: SceneObject }>> = {
 }
 
 /** Pipeline A: dispositivos modelados por receita declarativa */
-const RECIPE_TYPES = ['motor_dc', 'sensor_photoelectric', 'infra_base_plate']
+const RECIPE_TYPES = [
+  'motor_dc', 'motor_ac', 'motor_stepper', 'motor_servo',
+  'sensor_photoelectric', 'sensor_photoelectric_receptor', 'sensor_inductive',
+  'sensor_limit_switch', 'sensor_temperature', 'sensor_pressure', 'sensor_encoder',
+  'cylinder_pneumatic', 'valve_pneumatic_5_2', 'camera_ip',
+  'clp_generic', 'vfd_generic',
+  'infra_base_plate', 'infra_din_rail', 'infra_i_beam', 'infra_pillar', 'infra_profile_alu',
+]
 
 const RecipeMesh: React.FC<{ obj: SceneObject; selected: boolean; onSelect: (id: string) => void }> = ({ obj, selected, onSelect }) => {
   const receita = receitaPara(obj.type_id || '', obj.properties)

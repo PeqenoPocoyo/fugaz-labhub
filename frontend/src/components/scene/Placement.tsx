@@ -150,18 +150,49 @@ export const Placement: React.FC<PlacementProps> = ({
   const [movendo, setMovendo] = useState(false)
   const grupoRef = useRef<THREE.Group>(null)
 
+  // estado do arraste: altura e rotação atuais do selecionado
+  const alturaAtual = selecionado?.position?.[1] ?? ALTURA_CENA
+  const [elevando, setElevando] = useState<number | null>(null)
+  const [girando, setGirando] = useState<number>(0)
+  const ultimoY = useRef(0)
+
   useEffect(() => {
     if (!movendo) return
-    const desliga = () => {
-      if (controls) (controls as any).enabled = false
-    }
-    desliga()
+    if (controls) (controls as any).enabled = false
+    setElevando(alturaAtual)
+    setGirando(0)
+    ultimoY.current = 0
+
     const onMove = (e: PointerEvent) => {
+      if (!selecionado) return
       const p = paraChao(e.clientX, e.clientY)
-      if (p && selecionado) onMover(selecionado.id, p, 0)
+      if (!p) return
+
+      if (e.shiftKey) {
+        // SHIFT = girar: a peça aponta na direção do cursor
+        const ang = Math.atan2(p[0] - selecionado.position[0], p[2] - selecionado.position[2])
+        setGirando(ang)
+        onMover(selecionado.id, selecionado.position, ang)
+        return
+      }
+      if (e.ctrlKey || e.metaKey) {
+        // CTRL = elevar/abaixar: arraste vertical muda a altura
+        if (ultimoY.current) {
+          const delta = (ultimoY.current - e.clientY) * 0.01
+          const nova = Math.max(0, Math.min(4, (elevando ?? alturaAtual) + delta))
+          setElevando(nova)
+          onMover(selecionado.id, [selecionado.position[0], nova, selecionado.position[2]], girando)
+        }
+        ultimoY.current = e.clientY
+        return
+      }
+      // padrão: mover no plano do chão
+      onMover(selecionado.id, [p[0], elevando ?? alturaAtual, p[2]], girando)
     }
     const onUp = () => {
       setMovendo(false)
+      setElevando(null)
+      setGirando(0)
       if (controls) (controls as any).enabled = true
     }
     window.addEventListener('pointermove', onMove)
@@ -171,7 +202,31 @@ export const Placement: React.FC<PlacementProps> = ({
       window.removeEventListener('pointerup', onUp)
       if (controls) (controls as any).enabled = true
     }
-  }, [movendo, selecionado, onMover])
+  }, [movendo, selecionado, onMover, alturaAtual, elevando, girando])
+
+  // teclado com a peça selecionada: R gira 15°, [ e ] elevam/abaixam
+  useEffect(() => {
+    if (!selecionado || pendente) return
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      const k = e.key.toLowerCase()
+      if (k === 'r') {
+        const passo = e.shiftKey ? Math.PI / 2 : Math.PI / 12
+        const novo = (girando || 0) + passo
+        setGirando(novo)
+        onMover(selecionado.id, selecionado.position, novo)
+      } else if (k === '[' || k === ']') {
+        const passo = e.shiftKey ? 0.5 : 0.1
+        const base = elevando ?? selecionado.position[1]
+        const nova = Math.max(0, Math.min(4, base + (k === ']' ? passo : -passo)))
+        setElevando(nova)
+        onMover(selecionado.id, [selecionado.position[0], nova, selecionado.position[2]], girando)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selecionado, pendente, onMover, girando, elevando])
 
   return (
     <group>
@@ -202,8 +257,8 @@ export const Placement: React.FC<PlacementProps> = ({
 
       {/* ---------- alça de mover o selecionado ---------- */}
       {selecionado && !pendente && (
-        <group position={selecionado.position}>
-          {/* disco de arraste no chão (invisível, só captura o ponteiro) */}
+        <group position={[selecionado.position[0], elevando ?? selecionado.position[1], selecionado.position[2]]}>
+          {/* disco de arraste no chão */}
           <mesh
             rotation={[-Math.PI / 2, 0, 0]}
             position={[0, -selecionado.position[1] + 0.02, 0]}
@@ -214,12 +269,17 @@ export const Placement: React.FC<PlacementProps> = ({
             <circleGeometry args={[0.55, 24]} />
             <meshBasicMaterial transparent opacity={movendo ? 0.18 : 0.06} color="#00B4D8" depthWrite={false} />
           </mesh>
-          {/* anel de seleção mais visível */}
+          {/* anel de seleção */}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -selecionado.position[1] + 0.012, 0]}>
             <ringGeometry args={[0.5, 0.55, 32]} />
             <meshBasicMaterial color="#00B4D8" transparent opacity={0.85} side={THREE.DoubleSide} />
           </mesh>
-          <SetaDirecao rotY={0} escala={0.7} />
+          <SetaDirecao rotY={girando} escala={0.7} />
+          {/* marcador de altura (linha até o chão) */}
+          <mesh position={[0, -(selecionado.position[1]) / 2, 0]}>
+            <cylinderGeometry args={[0.003, 0.003, Math.max(0.01, selecionado.position[1]), 4]} />
+            <meshBasicMaterial color="#00B4D8" transparent opacity={0.3} />
+          </mesh>
           {movendo && (
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -selecionado.position[1] + 0.02, 0]}>
               <ringGeometry args={[0.2, 0.5, 24, 1, 0, Math.PI * 1.4]} />

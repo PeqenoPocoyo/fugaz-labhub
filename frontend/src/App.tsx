@@ -13,6 +13,7 @@ import { ProjectTree } from './components/shell/ProjectTree'
 import { Inspector } from './components/shell/Inspector'
 import { BenchScene } from './components/scene/BenchScene'
 import { Placement } from './components/scene/Placement'
+import { FrameController } from './components/scene/FrameController'
 import { CameraPiP } from './components/scene/CameraPiP'
 import { CommandPalette } from './components/command/CommandPalette'
 import DiagnosisConsole from './components/diagnostics/DiagnosisConsole'
@@ -187,6 +188,7 @@ const App: React.FC = () => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o) }
       if (e.key === 'Escape') setFiaçãoDe(null)
+      if (e.key === 'Home') { e.preventDefault(); window.dispatchEvent(new Event('labhub:enquadrar')) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -200,6 +202,7 @@ const App: React.FC = () => {
 
   const commands = React.useMemo(() => [
     { id: 'sim_toggle', group: 'Simulação', label: simRunning ? 'Parar simulação' : 'Iniciar simulação', hint: '60Hz', icon: simRunning ? Pause : Play, run: toggleSim },
+    { id: 'enquadrar', group: 'Visualização', label: 'Enquadrar tudo', hint: 'Home', icon: Crosshair, run: () => window.dispatchEvent(new Event('labhub:enquadrar')) },
     { id: 'xray_max', group: 'Visualização', label: 'Raio-X: mostrar tudo', icon: Layers, run: () => setXray(1) },
     { id: 'console', group: 'Visualização', label: consoleAberto ? 'Fechar console' : 'Abrir console', icon: Terminal, run: () => setConsoleAberto(v => !v) },
     { id: 'clear_log', group: 'Diagnóstico', label: 'Limpar log', icon: Terminal, run: removerLogs },
@@ -227,6 +230,11 @@ const App: React.FC = () => {
 
         <div style={{ flex: 1 }} />
 
+        <button className="sh-btn"
+          onClick={() => window.dispatchEvent(new Event('labhub:enquadrar'))}
+          title="Enquadrar tudo (Home)">
+          <Crosshair size={10} /> enquadrar
+        </button>
         <button className="sh-btn" onClick={() => setPaletteOpen(true)} title="Comandos (Ctrl+K)">
           <Search size={10} /> comandos
         </button>
@@ -308,6 +316,7 @@ const App: React.FC = () => {
             onMover={handleMover}
             onRot={() => {}}
           />
+          <FrameController objects={objects} />
           <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
         </Canvas>
 
@@ -318,7 +327,7 @@ const App: React.FC = () => {
             ? <span style={{ color: 'var(--acc)' }}>posicionando <b>{pendente}</b> · R gira · solte p/ criar</span>
             : fiaçãoDe
               ? <span style={{ color: 'var(--warn)' }}>fiação: escolha o destino · Esc cancela</span>
-              : <span className="sh-hint">arraste p/ orbitar · arraste da árvore p/ posicionar · arraste a alça p/ mover · clique no conector p/ ligar fio</span>}
+              : <span className="sh-hint">arraste p/ orbitar · arraste da árvore p/ posicionar · alça move (Shift=gira, Ctrl=eleva) · R gira · [ ] altura · Home enquadra</span>}
         </div>
 
         {/* HUD: raio-X */}
