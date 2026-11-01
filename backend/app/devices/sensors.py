@@ -49,6 +49,54 @@ def create_photoelectric_sensor(device_id: str = None) -> Device:
     return dev
 
 
+def create_photoelectric_receptor() -> Device:
+    """
+    Receptor fotoelétrico — a outra ponta da barreira óptica.
+
+    Fecha o par com `sensor_photoelectric`: o emissor lança o feixe, este
+    recebe. A detecção acontece quando o feixeentre os dois é interrompido
+    (objeto no caminho) ou quando o par está desalinhado.
+    """
+    dev = Device(
+        type_id="sensor_photoelectric_receptor",
+        name="Receptor Fotoelétrico",
+        category=DeviceCategory.SENSOR,
+        properties={
+            "range_mm": {"value": 500, "unit": "mm", "configurable": True},
+            "emitter_id": "",        # id do emissor emparelhado (vazio = não pareado)
+            "beam_blocked": False,
+            "aligned": True,
+            "sensitivity": 0.5,
+        },
+        ports=[
+            Port.power("pwr", "24V"),
+            Port.digital_output("out", "Saída"),
+            Port.digital_input("align_cmd", "Alinhar"),
+        ],
+        metadata={"icon": "photoelectric", "description": "Receptor de barreira óptica (par do sensor)"},
+    )
+    dev.properties["object_detected"] = False
+
+    def detect(dev: Device, dt: float):
+        p = dev.properties
+        emitter_id = str(p.get("emitter_id", "") or "")
+        # sem emissor pareado: sem feixe, sem detecção (estado de falha visual)
+        if not emitter_id:
+            p["object_detected"] = False
+            p["aligned"] = True
+            dev.write_port("out", False)
+            return
+        # feixe íntegro = NADA detectado; feixe cortado = detectado
+        blocked = bool(p.get("beam_blocked", False))
+        p["object_detected"] = blocked
+        dev.write_port("out", blocked)
+        dev.state["error"] = not p.get("aligned", True)
+        dev.state["error_msg"] = "" if p.get("aligned", True) else "par desalinhado"
+
+    dev.add_behaviour(Behaviour(name="detect", trigger=Trigger.ON_TICK, action=detect))
+    return dev
+
+
 def create_inductive_sensor() -> Device:
     """Sensor indutivo (detecta metal)."""
     dev = Device(
@@ -310,6 +358,7 @@ def create_encoder() -> Device:
 
 SENSOR_FACTORY = {
     "sensor_photoelectric": create_photoelectric_sensor,
+    "sensor_photoelectric_receptor": create_photoelectric_receptor,
     "sensor_inductive": create_inductive_sensor,
     "sensor_capacitive": create_capacitive_sensor,
     "sensor_limit_switch": create_limit_switch,

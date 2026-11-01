@@ -218,6 +218,9 @@ STANDARD_FIXATIONS: Dict[str, List[FixationPoint]] = {
     "sensor_photoelectric": [
         FixationPoint("base_parafuso", (0, -0.35, 0), (0, 1, 0), FixDomain.MECHANICAL, 0.2, "Base com parafuso"),
     ],
+    "sensor_photoelectric_receptor": [
+        FixationPoint("base_parafuso", (0, -0.35, 0), (0, 1, 0), FixDomain.MECHANICAL, 0.2, "Base com parafuso"),
+    ],
     "sensor_inductive": [
         FixationPoint("porca_fixacao", (0, -0.25, 0), (0, 1, 0), FixDomain.MECHANICAL, 0.2, "Porca de fixação"),
     ],

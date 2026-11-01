@@ -55,16 +55,20 @@ const SPECIALIZED: Record<string, React.FC<{ obj: SceneObject }>> = {
 /** Pipeline A: dispositivos modelados por receita declarativa */
 const RECIPE_TYPES = ['motor_dc', 'sensor_photoelectric', 'infra_base_plate']
 
-const RecipeMesh: React.FC<{ obj: SceneObject }> = ({ obj }) => {
+const RecipeMesh: React.FC<{ obj: SceneObject; selected: boolean; onSelect: (id: string) => void }> = ({ obj, selected, onSelect }) => {
   const receita = receitaPara(obj.type_id || '', obj.properties)
   if (!receita) return null
   return (
     <group position={obj.position}>
-      <ModeloReceita receita={receita} />
+      {/* toda a peça é clicável (evento sobe das malhas filhas) */}
+      <group onClick={(e) => { e.stopPropagation(); onSelect(obj.id) }}>
+        <ModeloReceita receita={receita} />
+      </group>
       {/* etiqueta flutuante */}
       <Html position={[0, 0.45, 0]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
-        <div className="flex items-center gap-1 bg-[#141922]/85 border border-[#232C38] rounded px-1.5 py-0.5 whitespace-nowrap">
-          <span className="w-1.5 h-1.5 rounded-sm" style={{ background: '#00D4FF' }} />
+        <div className="flex items-center gap-1 bg-[#141922]/85 border rounded px-1.5 py-0.5 whitespace-nowrap"
+          style={{ borderColor: selected ? '#00E5FF' : '#232C38' }}>
+          <span className="w-1.5 h-1.5 rounded-sm" style={{ background: selected ? '#00E5FF' : '#6B7787' }} />
           <span className="text-[9px] font-mono text-[#D7DEE8]">{String(obj.type).slice(0, 16)}</span>
         </div>
       </Html>
@@ -205,7 +209,7 @@ export const BenchScene: React.FC<BenchSceneProps> = ({
         const Special = obj.type_id ? SPECIALIZED[obj.type_id] : undefined
         if (Special) return <Special key={id} obj={obj} />
         if (obj.type_id && RECIPE_TYPES.includes(obj.type_id)) {
-          return <RecipeMesh key={id} obj={obj} />
+          return <RecipeMesh key={id} obj={obj} selected={selectedId === id} onSelect={onSelect} />
         }
         return (
           <NodeMesh

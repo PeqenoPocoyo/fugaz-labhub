@@ -53,7 +53,10 @@ function motorDC(): Receita {
 }
 
 // ============================================================
-// SENSOR FOTELÉTRICO — pequeno, preciso, com cabo
+// SENSOR FOTELÉTRICO — emissor de feixe (barreira)
+//
+// Sem cabo no modelo: o caminho da fiação é do usuário. Fica só o
+// alívio de tração + o conector na saída, que é onde o fio começa.
 // ============================================================
 
 function sensorFotoeletrico(): Receita {
@@ -75,22 +78,43 @@ function sensorFotoeletrico(): Receita {
       // emissor (segunda lente)
       { t: 'cil', raio: 0.012, comp: 0.005, pos: [0.158, 0.028, 0], rot: [0, 0, Math.PI / 2], mat: 'vidro', cor: '#E53935' },
 
-      // --- LED de status (esfera emissiva) ---
+      // --- LED de status ---
       { t: 'rbox', size: [0.012, 0.012, 0.012], pos: [0.05, 0.032, 0], mat: 'plastico', cor: '#26A69A' },
 
-      // --- cabo saindo da traseira, com curva e conector ---
-      { t: 'cabo', raio: 0.011, mat: 'borracha', pontos: [
-        [-0.10, -0.02, 0],
-        [-0.20, -0.05, 0.02],
-        [-0.30, -0.03, 0.05],
-        [-0.38, 0.02, 0.03],
-      ] },
-      { t: 'cil', raio: 0.016, comp: 0.05, pos: [-0.41, 0.04, 0.03], rot: [0, 0, 1.35], mat: 'plastico' },
+      // --- saída do cabo: conector + alívio de tração (o fio começa aqui) ---
+      { t: 'cil', raio: 0.016, comp: 0.03, pos: [-0.115, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'plastico', cor: '#1C222B' },
+      { t: 'cil', raio: 0.012, comp: 0.02, pos: [-0.14, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'borracha' },
 
       // --- plaquinha ---
-      { t: 'decal', texto: 'PNP', largura: 0.05, pos: [0, 0.03, 0.029], rot: [0, 0, 0] },
+      { t: 'decal', texto: 'EMISSOR', largura: 0.05, pos: [0, 0.03, 0.029], rot: [0, 0, 0] },
 
       // --- suporte (bracket leve, só o pé) ---
+      { t: 'rbox', size: [0.05, 0.02, 0.05], pos: [cx, -0.028, 0], mat: 'acoEscovado', radius: 0.004 },
+    ],
+  }
+}
+
+// ============================================================
+// RECEPTOR FOTOELÉTRICO — a outra ponta da barreira
+// ============================================================
+
+function receptorFotoeletrico(): Receita {
+  const cx = 0.10
+  return {
+    id: 'sensor_photoelectric_receptor',
+    partes: [
+      { t: 'rbox', size: [0.20, 0.055, 0.055], pos: [0, 0, 0], mat: 'plastico', radius: 0.008 },
+      { t: 'cil', raio: 0.038, comp: 0.014, pos: [cx, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'latao' },
+      // cabeça receptora (janela larga, sem lente de emissor)
+      { t: 'rbox', size: [0.06, 0.06, 0.06], pos: [0.13, 0, 0], mat: 'plastico', radius: 0.008 },
+      { t: 'cil', raio: 0.03, comp: 0.008, pos: [0.158, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'plastico', cor: '#0B0E13' },
+      { t: 'cil', raio: 0.026, comp: 0.006, pos: [0.162, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'vidro' },
+      // LED de status
+      { t: 'rbox', size: [0.012, 0.012, 0.012], pos: [0.05, 0.032, 0], mat: 'plastico', cor: '#FFA726' },
+      // saída do cabo: conector + alívio de tração
+      { t: 'cil', raio: 0.016, comp: 0.03, pos: [-0.115, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'plastico', cor: '#1C222B' },
+      { t: 'cil', raio: 0.012, comp: 0.02, pos: [-0.14, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'borracha' },
+      { t: 'decal', texto: 'RECEPTOR', largura: 0.055, pos: [0, 0.03, 0.029], rot: [0, 0, 0] },
       { t: 'rbox', size: [0.05, 0.02, 0.05], pos: [cx, -0.028, 0], mat: 'acoEscovado', radius: 0.004 },
     ],
   }
@@ -128,6 +152,7 @@ function basePlana(cols = 4, rows = 3, spacing = 1.0, espessura = 0.01): Receita
 export const RECEITAS: Record<string, Receita> = {
   motor_dc: motorDC(),
   sensor_photoelectric: sensorFotoeletrico(),
+  sensor_photoelectric_receptor: receptorFotoeletrico(),
   infra_base_plate: basePlana(),
 }
 
