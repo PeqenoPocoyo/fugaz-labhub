@@ -1,48 +1,57 @@
+// App — shell do LABHUB.
+// Estrutura TIA Portal (árvore | área de trabalho | inspetor | console)
+// + atitude Factory I/O (a cena 3D domina, dados vivos na peça).
+// Zero decoração: cada pixel carrega dado ou é respiro.
 import React from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid, PerspectiveCamera } from '@react-three/drei'
 import { useSimulation } from './hooks/useSimulation'
 import { useWorldSync } from './hooks/useWorldSync'
 import { useSceneStore } from './store/sceneStore'
-import { DeviceDrawer } from './components/drawers/DeviceDrawer'
-import { DeviceCard } from './components/device/DeviceCard'
-import DiagnosisConsole from './components/diagnostics/DiagnosisConsole'
-import { NoticeStack, useNotices } from './components/diagnostics/NoticeStack'
+import { ProjectTree } from './components/shell/ProjectTree'
+import { Inspector } from './components/shell/Inspector'
 import { BenchScene } from './components/scene/BenchScene'
 import { CameraPiP } from './components/scene/CameraPiP'
 import { CommandPalette } from './components/command/CommandPalette'
-import { Layers, SlidersHorizontal, Radio, Crosshair, Pause, Play, Terminal, Trash2, Zap, Search } from 'lucide-react'
+import DiagnosisConsole from './components/diagnostics/DiagnosisConsole'
+import { NoticeStack, useNotices } from './components/diagnostics/NoticeStack'
+import {
+  Layers, Crosshair, Trash2, Zap, Search, Radio, Play, Pause, Terminal,
+} from 'lucide-react'
 import './styles/base.css'
+import './styles/shell.css'
 
 const App: React.FC = () => {
   const sim = useSimulation('ws://localhost:8000/ws/sim')
   useWorldSync(true)  // bancada reflete o mundo real do backend
   const { objects, connections, slots, conduits, drivetrains, selectObject, selectedId } = useSceneStore()
-  // Câmera selecionada → preview ao vivo (render duplo da vista fixa)
+
+  // câmera selecionada → preview ao vivo (render duplo da vista fixa)
   const cameraNode = selectedId && objects[selectedId]?.type_id === 'camera_ip'
     ? objects[selectedId] : null
-  const [view, setView] = React.useState<'bench' | 'commission'>('bench')
-  // fiação: porta de origem quando o usuário está conectando
-  const [fiaçãoDe, setFiaçãoDe] = React.useState<string | null>(null)
+  const selectedObj = selectedId ? objects[selectedId] ?? null : null
+
   const [dragOver, setDragOver] = React.useState(false)
-  const [xrayLevel, setXrayLevel] = React.useState(1) // 1 = tudo visível
+  const [xray, setXray] = React.useState(1)
   const [simRunning, setSimRunning] = React.useState(false)
   const [paletteOpen, setPaletteOpen] = React.useState(false)
+  const [consoleAberto, setConsoleAberto] = React.useState(true)
+  const [fiaçãoDe, setFiaçãoDe] = React.useState<string | null>(null)
   const { notices, push, dismiss } = useNotices()
   const booted = React.useRef(false)
 
-  // Log real (alimenta o Console de Diagnóstico)
+  // log real (alimenta o Console de Diagnóstico)
   const [logs, setLogs] = React.useState<any[]>([])
   const addLog = React.useCallback((level: string, source: string, message: string) => {
     const now = new Date()
-    const t = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}.${String(now.getMilliseconds()).padStart(3,'0')}`
+    const t = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`
     setLogs(prev => [{ id: Math.random().toString(36).slice(2), time: t, level, source, message }, ...prev].slice(0, 200))
   }, [])
 
   React.useEffect(() => {
-    if (booted.current) return  // evita duplicata no StrictMode
+    if (booted.current) return
     booted.current = true
-    push({ severity: 'info', title: 'Fugaz LABHUB pronto', source: 'boot', detail: 'Bancada carregada. Arraste dispositivos para começar.' })
+    push({ severity: 'info', title: 'LABHUB pronto', source: 'boot', detail: 'bancada conectada ao backend' })
     addLog('success', 'boot', 'Bancada carregada — backend conectado')
   }, [])
 
@@ -57,7 +66,7 @@ const App: React.FC = () => {
       push({ severity: 'success', title: `${d.name} adicionado`, source: 'spawn' })
       addLog('success', 'spawn', `${d.name} (${d.id}) adicionado à bancada`)
     } catch {
-      push({ severity: 'error', title: 'Falha ao adicionar', source: 'spawn', detail: 'Backend offline?' })
+      push({ severity: 'error', title: 'Falha ao adicionar', source: 'spawn', detail: 'backend offline?' })
       addLog('error', 'spawn', `Falha ao adicionar ${typeId} — backend offline?`)
     }
   }
@@ -68,7 +77,18 @@ const App: React.FC = () => {
     if (typeId) handleQuickAdd(typeId)
   }
 
-  // ---------- fiação: cria conexão real entre duas portas ----------
+  const toggleSim = () => {
+    if (simRunning) {
+      sim.stopSimulation(); setSimRunning(false)
+      push({ severity: 'info', title: 'Simulação parada', source: 'sim' }); addLog('info', 'sim', 'Simulação parada')
+    } else {
+      sim.startSimulation(); setSimRunning(true)
+      push({ severity: 'success', title: 'Simulação iniciada', source: 'sim', detail: 'passo fixo 60 Hz' })
+      addLog('success', 'sim', 'Simulação iniciada (passo fixo 60 Hz)')
+    }
+  }
+
+  // ---------- fiação ----------
   const handleConectar = async (alvoQualified: string) => {
     const origem = fiaçãoDe
     if (!origem) return
@@ -79,9 +99,8 @@ const App: React.FC = () => {
       })
       const data = await r.json()
       if (!r.ok) throw new Error(data?.detail || `HTTP ${r.status}`)
-      const c = data.connection
-      push({ severity: 'success', title: 'Fio criado', source: 'wire', detail: `${c.from_port} → ${c.to_port}` })
-      addLog('success', 'wire', `Conexão ${c.id} criada (${c.domain})`)
+      push({ severity: 'success', title: 'Fio criado', source: 'wire', detail: `${data.connection.domain}` })
+      addLog('success', 'wire', `Conexão ${data.connection.id} criada (${data.connection.domain})`)
       setFiaçãoDe(null)
     } catch (e: any) {
       push({ severity: 'error', title: 'Não conectou', source: 'wire', detail: String(e?.message || e) })
@@ -89,170 +108,207 @@ const App: React.FC = () => {
     }
   }
 
-  const toggleSim = () => {
-    if (simRunning) { sim.stopSimulation(); setSimRunning(false); push({ severity: 'info', title: 'Simulação parada', source: 'sim' }); addLog('info', 'sim', 'Simulação parada') }
-    else { sim.startSimulation(); setSimRunning(true); push({ severity: 'success', title: 'Simulação iniciada', source: 'sim', detail: 'Passo fixo 60 Hz' }); addLog('success', 'sim', 'Simulação iniciada (passo fixo 60 Hz)') }
+  const handleRemover = async (id: string) => {
+    try {
+      await fetch(`/api/devices/${id}`, { method: 'DELETE' })
+      selectObject(null)
+      addLog('warn', 'spawn', `Dispositivo ${id} removido`)
+    } catch {
+      push({ severity: 'error', title: 'Falha ao remover', source: 'spawn' })
+    }
   }
 
-  // Atalho global Ctrl/⌘+K
+  const handleProp = async (id: string, chave: string, valor: any) => {
+    try {
+      const r = await fetch(`/api/devices/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ properties: { [chave]: valor } }),
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      addLog('info', 'prop', `${id}.${chave} = ${JSON.stringify(valor)}`)
+    } catch {
+      push({ severity: 'error', title: 'Falha ao salvar', source: 'prop' })
+    }
+  }
+
+  // ---------- atalhos ----------
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o) }
+      if (e.key === 'Escape') setFiaçãoDe(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  const removerLogs = () => setLogs([])
+  const resetar = async () => {
+    await fetch('/api/world/reset', { method: 'POST' })
+    addLog('warn', 'world', 'Bancada resetada')
+  }
+
   const commands = React.useMemo(() => [
     { id: 'sim_toggle', group: 'Simulação', label: simRunning ? 'Parar simulação' : 'Iniciar simulação', hint: '60Hz', icon: simRunning ? Pause : Play, run: toggleSim },
-    { id: 'commission', group: 'Visualização', label: view === 'commission' ? 'Modo Bancada' : 'Modo Comissionamento', icon: Crosshair, run: () => setView(v => v === 'bench' ? 'commission' : 'bench') },
-    { id: 'xray_max', group: 'Visualização', label: 'Raio-X: mostrar tudo', icon: Layers, run: () => setXrayLevel(1) },
-    { id: 'clear_log', group: 'Diagnóstico', label: 'Limpar log', icon: Terminal, run: () => { setLogs([]) } },
-    { id: 'reset', group: 'Diagnóstico', label: 'Resetar bancada', icon: Trash2, run: async () => { await fetch('/api/world/reset', { method: 'POST' }); addLog('warn', 'world', 'Bancada resetada') } },
-    { id: 'proto', group: 'Diagnóstico', label: 'Ver protocolos ativos', icon: Radio, run: () => addLog('info', 'proto', 'Endpoint /api/protocols') },
+    { id: 'xray_max', group: 'Visualização', label: 'Raio-X: mostrar tudo', icon: Layers, run: () => setXray(1) },
+    { id: 'console', group: 'Visualização', label: consoleAberto ? 'Fechar console' : 'Abrir console', icon: Terminal, run: () => setConsoleAberto(v => !v) },
+    { id: 'clear_log', group: 'Diagnóstico', label: 'Limpar log', icon: Terminal, run: removerLogs },
+    { id: 'reset', group: 'Diagnóstico', label: 'Resetar bancada', icon: Trash2, run: resetar },
+    { id: 'proto', group: 'Diagnóstico', label: 'Ver protocolos ativos', icon: Radio, run: () => addLog('info', 'proto', 'endpoint /api/protocols') },
     ...['clp_generic', 'motor_dc', 'vfd_generic', 'sensor_photoelectric', 'conveyor_belt',
-        'trans_gears', 'trans_belt', 'trans_screw', 'vision_tape', 'vision_marker',
-        'camera_ip', 'pump_centrifugal', 'flow_vortex', 'valve_control', 'tank', 'duct']
+        'trans_gears', 'trans_belt', 'trans_screw', 'vision_tape', 'vision_marker', 'camera_ip',
+        'pump_centrifugal', 'flow_vortex', 'valve_control', 'tank', 'duct']
       .map(t => ({ id: `add_${t}`, group: 'Adicionar rápido', label: `Adicionar ${t.replace(/_/g, ' ')}`, icon: Zap, run: () => handleQuickAdd(t) })),
-  ], [simRunning, view, handleQuickAdd, addLog])
+  ], [simRunning, consoleAberto, handleQuickAdd, addLog])
 
   return (
-    <div className="w-screen h-screen flex flex-col bg-[#0B0E13] overflow-hidden">
-      {/* Topbar minimalista */}
-      <header className="h-11 bg-[#141922] border-b border-[#232C38] flex items-center px-4 gap-4 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-sm bg-gradient-to-br from-[#00E5FF] to-[#AB47BC] flex items-center justify-center">
-            <span className="text-white font-bold text-[11px]">F</span>
-          </div>
-          <span className="fz-display text-sm">Fugaz <span className="text-[#00E5FF]">LABHUB</span></span>
+    <div className="sh-shell fz-sans">
+      {/* ---------- TOPBAR ---------- */}
+      <header className="sh-top fz-mono" style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px',
+        background: 'var(--panel)', borderBottom: '1px solid var(--line)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 14, height: 14, background: 'var(--acc)', display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 700, color: '#0E1218' }}>F</span>
+          <span style={{ fontSize: 11, letterSpacing: '.04em', color: 'var(--tx)' }}>LABHUB</span>
         </div>
-        <div className="flex-1" />
-        {/* Atalho command palette */}
-        <button onClick={() => setPaletteOpen(true)}
-          title="Comandos (Ctrl+K)"
-          className="hidden md:flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono rounded border border-[#232C38] text-[#6B7787] hover:text-white hover:border-[#34404F] transition">
-          <Search size={11} /> <span className="opacity-60">⌘K</span>
+        <span style={{ width: 1, height: 16, background: 'var(--line-str)' }} />
+        <span className="fz-label" style={{ color: 'var(--tx-dim)' }}>projeto · bancada 01</span>
+
+        <div style={{ flex: 1 }} />
+
+        <button className="sh-btn" onClick={() => setPaletteOpen(true)} title="Comandos (Ctrl+K)">
+          <Search size={10} /> comandos
         </button>
-        {/* Toggle modo */}
-        <button onClick={() => setView(v => v === 'bench' ? 'commission' : 'bench')}
-          className={`flex items-center gap-1.5 px-2.5 py-1 text-[10px] rounded border transition ${
-            view === 'commission' ? 'bg-[#AB47BC]/15 border-[#AB47BC]/40 text-[#AB47BC]' : 'border-[#232C38] text-[#6B7787] hover:text-white'
-          }`}>
-          <Crosshair size={11} /> {view === 'bench' ? 'Comissionar' : 'Bancada'}
+        <button className="sh-btn" onClick={() => setConsoleAberto(v => !v)} title="Console">
+          <Terminal size={10} />
         </button>
-        {/* Sim */}
-        <button onClick={toggleSim}
-          className={`flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold rounded transition ${
-            simRunning ? 'bg-[#EF5350]/20 text-[#EF5350]' : 'bg-[#26A69A]/20 text-[#26A69A]'
-          }`}
-          style={simRunning ? { animation: 'fz-breathe 2s infinite' } : {}}>
-          {simRunning ? '■ Parar' : '▶ Simular'}
+        <button className={`sh-btn play${simRunning ? ' on' : ''}`} onClick={toggleSim}
+          title={simRunning ? 'Parar simulação' : 'Iniciar simulação'}>
+          {simRunning ? <Pause size={10} /> : <Play size={10} />} {simRunning ? 'parar' : 'simular'}
         </button>
-        <span className="flex items-center gap-1 text-[9px] font-mono text-[#6B7787]">
-          <Radio size={10} className="text-[#26A69A]" /> online
+        <span className="fz-mono" style={{ fontSize: 9, color: simRunning ? 'var(--ok)' : 'var(--tx-dim)' }}>
+          {simRunning ? '● rodando' : '○ parado'}
         </span>
       </header>
 
-      {/* Corpo: gaveta + bancada + cartão */}
-      <div className="flex-1 flex overflow-hidden min-h-0 relative"
+      {/* ---------- ÁRVORE DE PROJETO ---------- */}
+      <aside className="sh-tree">
+        <ProjectTree onSpawn={handleQuickAdd} onDragStart={() => setDragOver(true)} />
+      </aside>
+
+      {/* ---------- ÁREA DE TRABALHO 3D ---------- */}
+      <main className="sh-bench"
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}>
 
-        {/* Gaveta esquerda */}
-        <div className="w-60 shrink-0">
-          <DeviceDrawer onDragDevice={() => setDragOver(true)} onQuickAdd={handleQuickAdd} />
+        <Canvas className="w-full h-full" camera={{ position: [8, 7, 8], fov: 45 }}>
+          <PerspectiveCamera makeDefault position={[8, 7, 8]} fov={45} />
+          <ambientLight intensity={0.38} />
+          <directionalLight position={[8, 12, 6]} intensity={0.85} />
+          <hemisphereLight args={['#1A2130', '#0B0E13', 0.45]} />
+          <Grid args={[40, 40]} cellSize={0.5} cellColor="#161C26" sectionSize={2.5} sectionColor="#1E2630"
+            fadeDistance={45} infiniteGrid />
+          <BenchScene
+            objects={objects}
+            connections={connections}
+            slots={slots}
+            conduits={conduits}
+            drivetrains={drivetrains}
+            selectedId={selectedId}
+            fiaçãoDe={fiaçãoDe}
+            onSelect={(id) => selectObject(id)}
+            onIniciarFiação={(q) => setFiaçãoDe(q)}
+            onConectar={handleConectar}
+            onCancelarFiação={() => setFiaçãoDe(null)}
+          />
+          <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+        </Canvas>
+
+        {/* HUD: modo de interação ( Factory I/O: mínimo, informativo ) */}
+        <div className="sh-hud sh-hud-tl fz-mono">
+          <Crosshair size={9} />
+          {fiaçãoDe
+            ? <span style={{ color: 'var(--warn)' }}>fiação: escolha o destino · Esc cancela</span>
+            : <span className="sh-hint">arraste p/ orbitar · clique na peça p/ inspecionar · clique no conector p/ ligar fio</span>}
         </div>
 
-        {/* Bancada 3D */}
-        <main className="flex-1 relative min-w-0">
-          <Canvas className="w-full h-full" camera={{ position: [8, 7, 8], fov: 45 }}>
-            <PerspectiveCamera makeDefault position={[8, 7, 8]} fov={45} />
-            <ambientLight intensity={0.35} />
-            <directionalLight position={[8, 12, 6]} intensity={0.9} castShadow />
-            <hemisphereLight args={['#1A2130', '#0B0E13', 0.5]} />
-            <Grid args={[30, 30]} cellSize={1} cellColor="#1A2130" sectionSize={5} sectionColor="#232C38"
-              fadeDistance={40} infiniteGrid />
-            <BenchScene
+        {/* HUD: raio-X */}
+        <div className="sh-hud sh-hud-tr" style={{ flexDirection: 'column', gap: 4, padding: '5px 6px' }}>
+          <span className="fz-label">Raio-X</span>
+          <input type="range" min="0" max="1" step="0.05" value={xray}
+            onChange={e => setXray(parseFloat(e.target.value))}
+            style={{ width: 60, accentColor: 'var(--acc)' }} />
+          <span className="fz-mono" style={{ fontSize: 9, color: 'var(--acc)' }}>{(xray * 100).toFixed(0)}%</span>
+        </div>
+
+        {/* preview ao vivo da câmera (canto) */}
+        {cameraNode && (
+          <div style={{ position: 'absolute', top: 8, right: 90, zIndex: 20 }}>
+            <CameraPiP
+              camera={cameraNode}
               objects={objects}
               connections={connections}
               slots={slots}
               conduits={conduits}
               drivetrains={drivetrains}
-              selectedId={selectedId}
-              fiaçãoDe={fiaçãoDe}
-              onSelect={(id) => selectObject(id)}
-              onIniciarFiação={(q) => setFiaçãoDe(q)}
-              onConectar={handleConectar}
-              onCancelarFiação={() => setFiaçãoDe(null)}
+              onClose={() => selectObject(null)}
             />
-            <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
-          </Canvas>
-
-          {/* Overlay drop */}
-          {dragOver && (
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="border-2 border-dashed border-[#00E5FF] rounded-lg px-6 py-3 bg-[#00E5FF]/10 text-[#00E5FF] font-mono text-xs">
-                SOLTE PARA ENCAIXAR
-              </div>
-            </div>
-          )}
-
-          {/* Raio-X de camadas (slider vertical) */}
-          <div className="absolute top-3 right-3 flex flex-col items-center gap-1.5 bg-[#141922]/80 backdrop-blur border border-[#232C38] rounded p-2">
-            <Layers size={13} className="text-[#6B7787]" />
-            <span className="fz-label text-[8px]">RAIO-X</span>
-            <input type="range" min="0" max="1" step="0.05" value={xrayLevel}
-              onChange={e => setXrayLevel(parseFloat(e.target.value))}
-              className="h-24 w-1 accent-[#00E5FF]" style={{ writingMode: 'vertical-lr' } as any} />
-            <span className="text-[8px] font-mono text-[#00E5FF]">{(xrayLevel * 100).toFixed(0)}%</span>
           </div>
+        )}
 
-          {/* Notificações */}
+        {/* overlay de soltar */}
+        {dragOver && (
+          <div style={{
+            position: 'absolute', inset: 8, display: 'grid', placeItems: 'center',
+            border: '1px dashed var(--acc)', background: 'rgba(0,180,216,.06)', pointerEvents: 'none',
+          }}>
+            <span className="fz-mono" style={{ fontSize: 10, color: 'var(--acc)' }}>solte para adicionar</span>
+          </div>
+        )}
+
+        {/* notificações: canto superior esquerdo, abaixo do HUD (não colide
+            com o console que encosta no rodapé da bancada) */}
+        <div style={{ position: 'absolute', top: 32, left: 8, right: 8, zIndex: 15 }}>
           <NoticeStack notices={notices} onDismiss={dismiss} />
-
-          {/* Preview ao vivo da câmera (canto inferior direito) */}
-          {cameraNode && (
-            <div className="absolute bottom-3 right-3 z-20">
-              <CameraPiP
-                camera={cameraNode}
-                objects={objects}
-                connections={connections}
-                slots={slots}
-                conduits={conduits}
-                drivetrains={drivetrains}
-                onClose={() => selectObject(null)}
-              />
-            </div>
-          )}
-
-          {/* HUD canto inferior esquerdo */}
-          <div className="absolute bottom-3 left-3 flex items-center gap-3 text-[9px] font-mono text-[#6B7787]">
-            <span>{Object.keys(objects).length} nós</span>
-            <span>{connections.length} conexões</span>
-            <span className="flex items-center gap-1"><SlidersHorizontal size={9} /> arraste p/ orbitar</span>
-          </div>
-        </main>
-
-        {/* Gaveta direita: cartão do dispositivo */}
-        <div className="w-72 shrink-0">
-          <DeviceCard deviceId={selectedId} onClose={() => selectObject(null)} />
-          {!selectedId && (
-            <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-[#141922] border-l border-[#232C38]">
-              <div className="w-12 h-12 rounded-full border-2 border-[#232C38] flex items-center justify-center mb-3">
-                <Layers size={20} className="text-[#6B7787]" />
-              </div>
-              <p className="text-[11px] text-[#6B7787]">Selecione um dispositivo<br />na bancada</p>
-            </div>
-          )}
         </div>
-      </div>
+      </main>
 
-      {/* Command Palette */}
+      {/* ---------- INSPETOR ---------- */}
+      <aside className="sh-insp">
+        <Inspector
+          device={selectedObj}
+          objects={objects}
+          connections={connections}
+          drivetrains={drivetrains}
+          onConectarDe={(q) => setFiaçãoDe(q)}
+          onFechar={() => selectObject(null)}
+          onRemover={handleRemover}
+          onDefinirPropriedade={handleProp}
+        />
+      </aside>
+
+      {/* ---------- CONSOLE (rodapé da área de trabalho) ---------- */}
+      {consoleAberto && (
+        <div style={{ gridArea: 'bench', alignSelf: 'end', maxHeight: '38%', zIndex: 12 }}>
+          <DiagnosisConsole logs={logs} onClear={() => setLogs([])} />
+        </div>
+      )}
+
+      {/* ---------- BARRA DE STATUS ---------- */}
+      <footer className="sh-status-bar fz-mono">
+        <span className={`sh-led ${simRunning ? 'on' : 'off'}`} />
+        <span><b>{Object.keys(objects).length}</b> nós</span>
+        <span><b>{connections.length}</b> conexões</span>
+        <span><b>{drivetrains.length}</b> trens de força</span>
+        <span style={{ width: 1, height: 11, background: 'var(--line-str)' }} />
+        <span>passo fixo <b>60 Hz</b></span>
+        <span style={{ flex: 1 }} />
+        <span>arraste p/ orbitar · clique duplo na árvore adiciona</span>
+        <span style={{ color: 'var(--ok)' }}>● online</span>
+      </footer>
+
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
-
-      {/* Console de diagnóstico */}
-      <DiagnosisConsole logs={logs} onClear={() => setLogs([])} />
     </div>
   )
 }

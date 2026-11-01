@@ -1,0 +1,201 @@
+/* ============================================================
+   SHELL — sistema de design do LABHUB
+   Referência: TIA Portal (estrutura/densidade) + Factory I/O
+   (cena domina, dados na peça). Zero decoração: cada pixel
+   ou carrega dado, ou é respiro, ou sai.
+   ============================================================ */
+
+:root {
+  /* superfícies — escuras neutras (não azuladas) */
+  --bg:        #0E1218;   /* fora das áreas de trabalho */
+  --panel:     #131820;   /* painéis */
+  --panel-2:   #171E28;   /* painel aninhado / hover */
+  --bench:     #0A0D12;   /* área 3D (mais escura que os painéis) */
+
+  /* traços — 1px, funcionais */
+  --line:      #1E2630;   /* divisória padrão */
+  --line-str:  #2A3542;   /* divisória forte / foco */
+
+  /* texto — hierarquia por luminância, não por tamanho */
+  --tx:        #C5CDD8;   /* primário */
+  --tx-mut:    #7A8695;   /* secundário / rótulo */
+  --tx-dim:    #4A5563;   /* terciário / desabilitado */
+
+  /* estados — acento só onde há estado */
+  --acc:       #00B4D8;   /* seleção / interativo */
+  --ok:        #3FB950;   /* rodando / conectado */
+  --warn:      #D29922;   /* alerta */
+  --fault:     #F85149;   /* falha */
+
+  /* categorias do catálogo */
+  --cat-plc:       #00B4D8;
+  --cat-sensor:    #3FB950;
+  --cat-actuator:  #C77E23;
+  --cat-drive:     #8B5CF6;
+  --cat-structure: #6B7787;
+  --cat-vision:    #D29922;
+  --cat-transmission: #E2603A;
+  --cat-other:     #6B7787;
+}
+
+/* tipografia técnica: sans para cromo, mono para TODO número */
+.fz-mono { font-family: "Cascadia Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.fz-sans { font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif; }
+
+/* rótulo de painel: maiúsculo, pequeno, afastado — padrão TIA */
+.fz-label {
+  font-size: 9px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--tx-mut);
+}
+
+/* ---------- grade do shell ---------- */
+.sh-shell {
+  display: grid; height: 100vh; width: 100vw; overflow: hidden;
+  grid-template-rows: 36px 1fr 22px;      /* topbar | corpo | status */
+  grid-template-columns: 232px 1fr 312px; /* projeto | bancada | inspetor */
+  grid-template-areas:
+    "top top top"
+    "tree bench insp"
+    "status status status";
+  background: var(--bg);
+}
+.sh-top    { grid-area: top; }
+.sh-tree   { grid-area: tree; }
+.sh-bench  { grid-area: bench; position: relative; min-width: 0; background: var(--bench); }
+.sh-insp   { grid-area: insp; }
+.sh-status { grid-area: status; }
+
+/* painel genérico: fundo plano + 1px + cabeçalho denso */
+.sh-panel { background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+.sh-panel-head {
+  display: flex; align-items: center; gap: 8px;
+  height: 26px; padding: 0 8px; flex-shrink: 0;
+  border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.sh-panel-body { flex: 1; min-height: 0; overflow: auto; }
+.sh-panel-body::-webkit-scrollbar { width: 9px; height: 9px; }
+.sh-panel-body::-webkit-scrollbar-thumb { background: var(--line-str); border: 2px solid var(--panel); }
+.sh-panel-body::-webkit-scrollbar-track { background: transparent; }
+
+/* divisor vertical fino (sem sombra, sem gradiente) */
+.sh-div-v { border-right: 1px solid var(--line); }
+.sh-div-h { border-bottom: 1px solid var(--line); }
+
+/* ---------- itens de lista (árvore de projeto) ---------- */
+.sh-item {
+  display: flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 6px; cursor: pointer; user-select: none;
+  font-size: 11px; color: var(--tx); border-left: 2px solid transparent;
+}
+.sh-item:hover { background: var(--panel-2); }
+.sh-item.sel { background: var(--panel-2); border-left-color: var(--acc); color: #fff; }
+.sh-item.drop { background: rgba(0,180,216,.10); border-left-color: var(--acc); }
+.sh-item-drag { opacity: .45; }
+
+/* grupo da árvore */
+.sh-group > .sh-group-head {
+  display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 6px;
+  cursor: pointer; font-size: 9px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--tx-mut);
+}
+.sh-group > .sh-group-head:hover { color: var(--tx); background: var(--panel-2); }
+.sh-group-count { margin-left: auto; font-size: 9px; color: var(--tx-dim); }
+
+/* quadradinho de categoria (2px, sem glow) */
+.sh-dot { width: 6px; height: 6px; flex-shrink: 0; }
+
+/* ---------- tabelas de dados (inspetor) ---------- */
+.sh-grid { width: 100%; border-collapse: collapse; font-size: 10px; }
+.sh-grid th {
+  text-align: left; font-weight: 600; font-size: 8px; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--tx-dim); padding: 4px 6px;
+  border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel);
+}
+.sh-grid td { padding: 3px 6px; border-bottom: 1px solid rgba(30,38,48,.55); color: var(--tx); }
+.sh-grid tr:hover td { background: var(--panel-2); }
+
+/* valor mono sempre alinhado à direita quando numérico */
+.sh-num { font-family: "Cascadia Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---------- chips de estado ---------- */
+.sh-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 5px; font-size: 9px; font-weight: 600; letter-spacing: .03em;
+  border: 1px solid var(--line-str); color: var(--tx-mut); border-radius: 1px;
+}
+.sh-chip.ok   { color: var(--ok);    border-color: rgba(63,185,80,.4); }
+.sh-chip.warn { color: var(--warn);  border-color: rgba(210,153,34,.4); }
+.sh-chip.fault{ color: var(--fault); border-color: rgba(248,81,73,.4); }
+.sh-chip.acc  { color: var(--acc);   border-color: rgba(0,180,216,.4); }
+
+/* ---------- botões de chrome (flat, 1px) ---------- */
+.sh-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 22px; padding: 0 8px; font-size: 10px; font-weight: 500;
+  color: var(--tx-mut); background: transparent; border: 1px solid var(--line-str);
+  cursor: pointer; border-radius: 1px;
+}
+.sh-btn:hover { color: var(--tx); background: var(--panel-2); }
+.sh-btn.acc { color: var(--acc); border-color: rgba(0,180,216,.45); }
+.sh-btn.on  { color: #0E1218; background: var(--acc); border-color: var(--acc); }
+.sh-btn.play { color: var(--ok); border-color: rgba(63,185,90,.45); }
+.sh-btn.danger:hover { color: var(--fault); border-color: rgba(248,81,73,.5); }
+
+/* campo de busca flat */
+.sh-input {
+  width: 100%; height: 22px; padding: 0 6px 0 22px; font-size: 10px;
+  color: var(--tx); background: var(--bg); border: 1px solid var(--line-str);
+  border-radius: 1px; outline: none;
+}
+.sh-input:focus { border-color: var(--acc); }
+.sh-input::placeholder { color: var(--tx-dim); }
+
+/* ---------- área de trabalho 3D ---------- */
+/* molduras flutuantes mínimas — só o que a Factory I/O justifica */
+.sh-hud {
+  position: absolute; display: flex; align-items: center; gap: 6px;
+  padding: 3px 6px; background: rgba(14,18,24,.82);
+  border: 1px solid var(--line); border-radius: 1px;
+  font-size: 9px; color: var(--tx-mut);
+}
+.sh-hud-tl { top: 8px; left: 8px; }
+.sh-hud-tr { top: 8px; right: 8px; }
+.sh-hud-bl { bottom: 8px; left: 8px; }
+
+/* dica de interação (some sozinha) */
+.sh-hint { color: var(--tx-dim); font-size: 9px; }
+
+/* console inferior — recolhível, com abas */
+.sh-console { border-top: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
+.sh-console-tabs { display: flex; align-items: stretch; height: 24px; flex-shrink: 0; border-bottom: 1px solid var(--line); }
+.sh-tab {
+  display: flex; align-items: center; gap: 5px; padding: 0 10px;
+  font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--tx-dim); border-right: 1px solid var(--line); cursor: pointer; background: transparent;
+}
+.sh-tab:hover { color: var(--tx); }
+.sh-tab.on { color: var(--tx); background: var(--panel-2); box-shadow: inset 0 -2px 0 var(--acc); }
+
+/* barra de status — sempre presente, como toda IDE */
+.sh-status-bar {
+  display: flex; align-items: center; gap: 14px; padding: 0 10px;
+  font-size: 9px; color: var(--tx-dim); background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+.sh-status-bar b { color: var(--tx-mut); font-weight: 600; }
+
+/* led de conexão */
+.sh-led { width: 6px; height: 6px; border-radius: 50%; }
+.sh-led.on { background: var(--ok); }
+.sh-led.off { background: var(--fault); }
+
+/* notificação — barra fina no topo da bancada, não balão */
+.sh-notice {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px;
+  background: var(--panel-2); border-left: 2px solid var(--line-str);
+  font-size: 10px; color: var(--tx);
+}
+.sh-notice.ok    { border-left-color: var(--ok); }
+.sh-notice.warn  { border-left-color: var(--warn); }
+.sh-notice.error { border-left-color: var(--fault); }
+.sh-notice.info  { border-left-color: var(--acc); }

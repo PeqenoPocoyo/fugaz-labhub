@@ -101,7 +101,7 @@ const DiagnosisConsole: React.FC<DiagnosisConsoleProps> = ({
 
   if (!open) {
     return (
-      <div className="shrink-0 h-8 bg-[#141922] border-t border-[#232C38] flex items-center px-3 gap-2">
+      <div className="sh-console-tabs" style={{ background: 'var(--panel)' }}>
         <button onClick={() => setOpen(true)} className="text-[#6B7787] hover:text-white"><ChevronUp size={14} /></button>
         <span className="fz-label">Diagnóstico</span>
         {counts.error > 0 && <span className="text-[10px] font-mono text-[#EF5350]">{counts.error} erros</span>}
