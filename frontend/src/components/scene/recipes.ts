@@ -792,6 +792,95 @@ function flange(): Receita {
 }
 
 // ============================================================
+// PACOTE PNEUMÁTICO/HIDRÁULICO
+// ============================================================
+
+function compressor(): Receita {
+  return {
+    id: 'air_source',
+    partes: [
+      // reservatório horizontal
+      { t: 'torno', perfil: [[0.001, -0.18], [0.14, -0.18], [0.16, -0.14], [0.16, 0.14], [0.14, 0.18], [0.001, 0.18]],
+        pos: [-0.10, 0, 0], rot: [Math.PI / 2, 0, 0], mat: 'acoPintado', cor: '#2F3B4C' },
+      // pés do reservatório
+      { t: 'rbox', size: [0.05, 0.10, 0.16], pos: [-0.28, -0.13, 0], mat: 'acoEscovado', radius: 0.008 },
+      { t: 'rbox', size: [0.05, 0.10, 0.16], pos: [0.08, -0.13, 0], mat: 'acoEscovado', radius: 0.008 },
+      // cabeçote do compressor (motor + bomba)
+      { t: 'rbox', size: [0.20, 0.18, 0.20], pos: [0.24, 0, 0], mat: 'acoPintado', radius: 0.015 },
+      { t: 'aletas', count: 8, eixo: 'x', comp: 0.18, altura: 0.20, pos: [0.24, 0, 0], mat: 'aluminio' },
+      // manômetro
+      { t: 'cil', raio: 0.04, comp: 0.02, pos: [0.24, 0.10, 0.11], rot: [Math.PI / 2, 0, 0], mat: 'acoEscovado' },
+      { t: 'decal', texto: 'bar', largura: 0.03, pos: [0.24, 0.10, 0.125], rot: [0, 0, 0], fontePx: 12 },
+      // saída de ar com registro
+      { t: 'cil', raio: 0.022, comp: 0.08, pos: [0.16, 0.12, 0], rot: [0, Math.PI / 2, 0], mat: 'latao' },
+      { t: 'cil', raio: 0.032, comp: 0.02, pos: [0.21, 0.12, 0], rot: [0, Math.PI / 2, 0], mat: 'latao' },
+      // botão liga/desliga
+      { t: 'cil', raio: 0.018, comp: 0.012, pos: [0.24, -0.10, 0.11], rot: [Math.PI / 2, 0, 0], mat: 'plastico', cor: '#3FB950' },
+      // plaqueta
+      { t: 'decal', texto: 'AIR', largura: 0.07, pos: [0.24, 0.02, 0.105] },
+    ],
+    portas: {
+      out: [0.25, 0.12, 0],
+      run: [0.24, -0.086, 0.115],
+      pressure_ok: [0.24, -0.086, 0.09],
+    },
+  }
+}
+
+function frl(): Receita {
+  return {
+    id: 'frl',
+    partes: [
+      // corpo em linha (torneira + filtro + lubrificador)
+      { t: 'cil', raio: 0.05, comp: 0.16, pos: [0, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'acoPintado', cor: '#1E88E5' },
+      // tigela do filtro (transparente, com água)
+      { t: 'cil', raio: 0.055, comp: 0.14, pos: [-0.06, -0.10, 0], rot: [0, 0, Math.PI / 2], mat: 'plastico', cor: '#3A4553' },
+      { t: 'cil', raio: 0.045, comp: 0.06, pos: [-0.06, -0.155, 0], rot: [0, 0, Math.PI / 2], mat: 'plastico', cor: '#29B6F6' },
+      // regulador com botão de ajuste
+      { t: 'rbox', size: [0.07, 0.07, 0.07], pos: [0.07, 0.06, 0], mat: 'acoPintado', radius: 0.006 },
+      { t: 'cil', raio: 0.022, comp: 0.05, pos: [0.07, 0.115, 0], mat: 'plastico', cor: '#C0392B' },
+      // manômetro do regulador
+      { t: 'cil', raio: 0.028, comp: 0.012, pos: [-0.02, 0.075, 0.04], rot: [Math.PI / 2, 0, 0], mat: 'acoEscovado' },
+      // lubrificador (copinho com óleo)
+      { t: 'cil', raio: 0.035, comp: 0.08, pos: [0.13, -0.08, 0], rot: [0, 0, Math.PI / 2], mat: 'plastico', cor: '#3A4553' },
+      // entradas
+      { t: 'cil', raio: 0.022, comp: 0.05, pos: [-0.10, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'latao' },
+      { t: 'cil', raio: 0.022, comp: 0.05, pos: [0.17, 0, 0], rot: [0, 0, Math.PI / 2], mat: 'latao' },
+      { t: 'decal', texto: 'FRL', largura: 0.05, pos: [0.02, 0.055, 0.052], rot: [0, 0, 0], fontePx: 12 },
+    ],
+    portas: { in: [-0.128, 0, 0], out: [0.198, 0, 0] },
+  }
+}
+
+function valvulaSolenoide(): Receita {
+  return {
+    id: 'valve_solenoid_3_2',
+    partes: [
+      // bloco
+      { t: 'rbox', size: [0.18, 0.06, 0.06], pos: [0, 0, 0], mat: 'acoPintado', radius: 0.005 },
+      // bobina (cilindro azul escuro com conector)
+      { t: 'cil', raio: 0.024, comp: 0.08, pos: [-0.05, 0.055, 0], mat: 'plastico', cor: '#1A237E' },
+      { t: 'cil', raio: 0.030, comp: 0.012, pos: [-0.05, 0.095, 0], mat: 'acoEscovado' },
+      { t: 'cil', raio: 0.008, comp: 0.02, pos: [-0.05, 0.115, 0], mat: 'borracha' },
+      // override manual (chave amarela)
+      { t: 'cil', raio: 0.010, comp: 0.014, pos: [-0.05, 0.03, 0.02], rot: [Math.PI / 2, 0, 0], mat: 'plastico', cor: '#F2C200' },
+      // conexões: in, out, escape
+      { t: 'cil', raio: 0.013, comp: 0.05, pos: [-0.10, -0.05, 0], rot: [0, Math.PI / 2, 0], mat: 'latao' },
+      { t: 'cil', raio: 0.013, comp: 0.05, pos: [0, -0.05, 0], rot: [0, Math.PI / 2, 0], mat: 'latao' },
+      { t: 'cil', raio: 0.013, comp: 0.05, pos: [0.10, -0.05, 0], rot: [0, Math.PI / 2, 0], mat: 'latao' },
+      { t: 'cil', raio: 0.018, comp: 0.02, pos: [0.10, -0.085, 0], rot: [0, Math.PI / 2, 0], mat: 'plastico', cor: '#0B0E13' },
+      { t: 'decal', texto: '3/2', largura: 0.04, pos: [0.02, 0.033, 0], rot: [Math.PI / 2, 0, 0], fontePx: 12 },
+    ],
+    portas: {
+      coil: [-0.05, 0.128, 0],
+      in: [-0.10, -0.082, 0],
+      out: [0, -0.082, 0],
+      exhaust: [0.10, -0.098, 0],
+    },
+  }
+}
+
+// ============================================================
 // CATÁLOGO
 // ============================================================
 
@@ -826,6 +915,9 @@ export const RECEITAS: Record<string, Receita> = {
   pump_dosing: pronta(bombaDosadora()),
   soft_starter: pronta(softStarter()),
   flange: pronta(flange()),
+  air_source: pronta(compressor()),
+  frl: pronta(frl()),
+  valve_solenoid_3_2: pronta(valvulaSolenoide()),
 }
 
 /** bornes (já escalados) de um tipo — usados no spawn para o backend */

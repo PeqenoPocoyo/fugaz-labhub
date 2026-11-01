@@ -5,7 +5,7 @@
 import React from 'react'
 import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Grid, PerspectiveCamera } from '@react-three/drei'
+import { Grid, PerspectiveCamera } from '@react-three/drei'
 import { useSimulation } from './hooks/useSimulation'
 import { useWorldSync } from './hooks/useWorldSync'
 import { useSceneStore } from './store/sceneStore'
@@ -15,6 +15,7 @@ import { BenchScene } from './components/scene/BenchScene'
 import { Placement } from './components/scene/Placement'
 import { FrameController } from './components/scene/FrameController'
 import { CameraLock } from './components/scene/CameraLock'
+import { SceneCamera, FactoryControls } from './components/scene/SceneCamera'
 import { bornesDe } from './components/scene/recipes'
 import { CameraPiP } from './components/scene/CameraPiP'
 import { CommandPalette } from './components/command/CommandPalette'
@@ -322,7 +323,9 @@ const App: React.FC = () => {
       <main className="sh-bench"
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}>
+        onDrop={handleDrop}
+        /* o botão direito gira a câmera: não abre o menu de contexto */
+        onContextMenu={e => e.preventDefault()}>
 
         <Canvas className="w-full h-full" camera={{ position: [8, 7, 8], fov: 45 }}>
           <PerspectiveCamera makeDefault position={[8, 7, 8]} fov={45} />
@@ -379,7 +382,9 @@ const App: React.FC = () => {
           />
           <FrameController objects={objects} selecionado={selectedId} />
           <CameraLock />
-          <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+          <SceneCamera />
+          {/* controles no gesto Factory I/O (substitui o OrbitControls antigo) */}
+          <FactoryControls />
         </Canvas>
 
         {/* HUD: modo de interação ( Factory I/O: mínimo, informativo ) */}

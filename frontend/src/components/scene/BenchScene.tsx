@@ -65,6 +65,7 @@ const RECIPE_TYPES = [
   'infra_base_plate', 'infra_din_rail', 'infra_i_beam', 'infra_pillar', 'infra_profile_alu',
   'sensor_capacitive', 'sensor_emergency_button', 'sensor_level', 'sensor_load_cell',
   'cylinder_hydraulic', 'actuator_linear', 'pump_dosing', 'soft_starter', 'flange',
+  'air_source', 'frl', 'valve_solenoid_3_2',
 ]
 
 const RecipeMesh: React.FC<{
@@ -226,7 +227,6 @@ export const BenchScene: React.FC<BenchSceneProps> = ({
             to={c.to}
             domain={toWireDomain(c.domain)}
             active
-            gauge={c.domain === 'hydraulic' ? 1.6 : c.domain === 'data' ? 0.6 : 1}
             waypoints={c.properties?.path}
           />
           <WireGrab

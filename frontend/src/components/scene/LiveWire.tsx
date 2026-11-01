@@ -15,6 +15,19 @@ const DOMAIN_COLOR: Record<WireDomain, string> = {
   signal:     '#66BB6A',  // verde
 }
 
+/**
+ * FÍSICA DO CONDUTO — cada domínio tem bitola e rigidez próprias.
+ * Rigidez alta = cabo reto (cai pouco); baixa = fio mole (barriga grande).
+ * Mangueira é mais grossa e mais tesa que fio elétrico — lê-se de imediato.
+ */
+const DOMAIN_FISICA: Record<WireDomain, { gauge: number; rigidez: number; corFisica: string }> = {
+  electrical: { gauge: 1.00, rigidez: 0.55, corFisica: '#2A323D' },  // fio 24V: fino, médio
+  signal:     { gauge: 0.55, rigidez: 0.30, corFisica: '#1C222B' },  // fio de sinal: fino, mole
+  data:       { gauge: 0.75, rigidez: 0.70, corFisica: '#232B36' },  // cabo de rede: médio, teso
+  pneumatic:  { gauge: 1.90, rigidez: 0.85, corFisica: '#14181F' },  // mangueira: grossa, TESA
+  hydraulic:  { gauge: 2.60, rigidez: 0.95, corFisica: '#0F1216' },  // alta pressão: grossíssima
+}
+
 interface LiveWireProps {
   from: [number, number, number]
   to: [number, number, number]
@@ -30,7 +43,9 @@ export const LiveWire: React.FC<LiveWireProps> = ({
   from, to, domain, active = true, gauge = 1, label, waypoints
 }) => {
   const color = DOMAIN_COLOR[domain]
-  const radius = 0.02 * gauge
+  const fisica = DOMAIN_FISICA[domain] || DOMAIN_FISICA.electrical
+  // bitola: a recebida manda quando explícita; senão, a do domínio
+  const radius = 0.016 * (gauge ?? fisica.gauge)
 
   // Curva: sem waypoints = sag natural; com = passa pelos pontos do usuário
   const curve = useMemo(() => {
@@ -40,15 +55,16 @@ export const LiveWire: React.FC<LiveWireProps> = ({
       const pts = [start, ...waypoints.map(w => new THREE.Vector3(...w)), end]
       return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.08)
     }
-    const mid = start.clone().add(end).multiplyScalar(0.5)
     const dist = start.distanceTo(end)
-    mid.y -= Math.min(0.6, dist * 0.15)  // sag proporcional à distância
-    return new THREE.QuadraticBezierCurve3(
-      start,
-      mid.add(new THREE.Vector3((Math.random() - 0.5) * 0.2, 0, (Math.random() - 0.5) * 0.2)),
-      end
-    )
-  }, [from, to, waypoints])
+    // sag limitado pela RIGIDEZ: mangueira de ar quase não cai; fio de sinal
+    // faz barriga pronunciada. Também varia levemente a cada conexão.
+    const sag = Math.min(0.75, dist * 0.16 * (1 - fisica.rigidez))
+    const mid = start.clone().add(end).multiplyScalar(0.5)
+    mid.y -= sag
+    mid.x += (Math.random() - 0.5) * Math.min(0.25, dist * 0.06)
+    mid.z += (Math.random() - 0.5) * Math.min(0.25, dist * 0.06)
+    return new THREE.QuadraticBezierCurve3(start, mid, end)
+  }, [from, to, waypoints, fisica.rigidez])
 
   const matRef = useRef<any>(null)
 

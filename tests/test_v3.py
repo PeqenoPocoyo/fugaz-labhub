@@ -348,6 +348,77 @@ def test_receptor_completa_par_barreira():
 
 
 # ============================================================
+# CADEIA PNEUMÁTICA (compressor → FRL → válvula → cilindro)
+# ============================================================
+
+def test_pneumatic_chain_end_to_end():
+    """Ar comprimido percorre a cadeia inteira com regulação no FRL."""
+    from app.sim.world import World
+    from app.devices.registry import registry
+
+    world = World()
+    ar = world.add_node(registry.create("air_source"))
+    frl = world.add_node(registry.create("frl"))
+    val = world.add_node(registry.create("valve_solenoid_3_2"))
+    cil = world.add_node(registry.create("cylinder_pneumatic"))
+    world.sim_running = True
+    ar.on_start(); frl.on_start(); val.on_start(); cil.on_start()
+
+    world.connect(f"{ar.id}_out", f"{frl.id}_in")
+    world.connect(f"{frl.id}_out", f"{val.id}_in")
+    world.connect(f"{val.id}_out", f"{cil.id}_port_a")
+
+    ar.write_port("run", True)
+    val.write_port("coil", True)
+
+    for _ in range(60):
+        world.update(1 / 60)
+
+    # compressor entrega a pressão do reservatório
+    assert ar.ports["out"].value["pressure_bar"] == pytest.approx(8.0, abs=0.5)
+    # FRL regula para o ajuste (5 bar) e nunca entrega mais que a entrada
+    assert frl.ports["out"].value["pressure_bar"] == pytest.approx(5.0, abs=0.3)
+    # válvula energizada deixa o ar passar
+    assert val.ports["out"].value["pressure_bar"] == pytest.approx(5.0, abs=0.3)
+    # cilindro recebe pressão na porta A
+    assert cil.ports["port_a"].value["pressure_bar"] == pytest.approx(5.0, abs=0.3)
+
+
+def test_pneumatic_valve_closed_blocks_air():
+    """Válvula desenergizada bloqueia o ar (escape aberto)."""
+    from app.sim.world import World
+    from app.devices.registry import registry
+
+    world = World()
+    ar = world.add_node(registry.create("air_source"))
+    val = world.add_node(registry.create("valve_solenoid_3_2"))
+    world.sim_running = True
+    ar.on_start(); val.on_start()
+    world.connect(f"{ar.id}_out", f"{val.id}_in")
+
+    ar.write_port("run", True)
+    # bobina DESLIGADA
+    for _ in range(30):
+        world.update(1 / 60)
+    assert val.ports["out"].value["pressure_bar"] == pytest.approx(0.0, abs=0.01)
+
+
+def test_propagation_survives_unwritten_ports():
+    """Regressão: propagar com porta de origem vazia (None) não pode quebrar o loop."""
+    from app.sim.world import World
+    from app.devices.registry import registry
+
+    world = World()
+    ar = world.add_node(registry.create("air_source"))
+    frl = world.add_node(registry.create("frl"))
+    world.sim_running = True
+    ar.on_start(); frl.on_start()
+    world.connect(f"{ar.id}_out", f"{frl.id}_in")
+    # nenhuma porta escrita, simulação desligada: update não deve lançar
+    world.update(1 / 60)   # não deve levantar TypeError
+
+
+# ============================================================
 # REGISTRY
 # ============================================================
 

@@ -82,6 +82,9 @@ class DeviceRegistry:
         "tank": "Tanque",
         # fluidos
         "flow_vortex": "Medidor de Vazão Vortex",
+        "air_source": "Compressor de Ar",
+        "frl": "FRL (Filtro-Reg-Lubrif)",
+        "valve_solenoid_3_2": "Válvula Solenoide 3/2",
     }
 
     def __init__(self):

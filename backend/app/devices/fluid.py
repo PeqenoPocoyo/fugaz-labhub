@@ -386,6 +386,140 @@ def create_tank() -> Device:
     return dev
 
 
+def create_air_source() -> Device:
+    """
+    Fonte de ar comprimido (compressor com reservatório) — a ORIGEM da cadeia
+    pneumática. Sem ela, cilindro e válvula 5/2 não têm o que acionar.
+    """
+    dev = Device(
+        type_id="air_source",
+        name="Compressor de Ar",
+        category=DeviceCategory.ACTUATOR,
+        properties={
+            "reservoir_l": 50.0,
+            "pressure_bar": {"value": 8.0, "unit": "bar", "configurable": True},
+            "max_pressure_bar": {"value": 10.0, "unit": "bar"},
+            "running": False,
+            "flow_out_m3h": 0.0,
+        },
+        ports=[
+            Port.pneumatic("out", "Saída de Ar", PortDirection.OUTPUT),
+            Port.digital_input("run", "Ligar"),
+            Port.digital_output("pressure_ok", "Pressão OK"),
+        ],
+        metadata={"icon": "compressor", "description": "Compressor com reservatório (fonte de ar)"},
+    )
+
+    def update(dev: Device, dt: float):
+        p = dev.properties
+        run = dev.read_port("run")
+        alvo = _num(p, "pressure_bar", 8.0)
+        max_p = _num(p, "max_pressure_bar", 10.0)
+        if run:
+            p["running"] = True
+        # enche o reservatório até a pressão alvo
+        atual = _num(p, "pressure_bar", 8.0)
+        if p["running"] and atual < alvo:
+            atual = min(alvo, atual + dt * 0.5)
+        p["pressure_bar"] = round(atual, 3)
+        p["flow_out_m3h"] = round(atual * 3.5, 2) if p["running"] else 0.0
+        dev.write_port("out", {"pressure_bar": atual, "flow_m3h": p["flow_out_m3h"], "medium": "air"})
+        dev.write_port("pressure_ok", atual >= alvo * 0.95)
+        dev.state["active"] = p["running"]
+
+    dev.add_behaviour(Behaviour(name="compress", trigger=Trigger.ON_TICK, action=update))
+    return dev
+
+
+def create_frl() -> Device:
+    """
+    FRL — Filtro + Regulador + Lubrificador (uma unidade só, como na prática).
+    Prepara o ar para a válvula: filtra, regula a pressão e lubrifica.
+    """
+    dev = Device(
+        type_id="frl",
+        name="FRL (Filtro-Reg-Lubrif)",
+        category=DeviceCategory.STRUCTURE,
+        properties={
+            "inlet_pressure_bar": 0.0,
+            "regulated_pressure_bar": {"value": 5.0, "unit": "bar", "configurable": True},
+            "outlet_pressure_bar": 0.0,
+            "filter_clogged": False,
+            "oil_level_pct": 80.0,
+            "lubrication_on": True,
+        },
+        ports=[
+            Port.pneumatic("in", "Entrada", PortDirection.INPUT),
+            Port.pneumatic("out", "Saída", PortDirection.OUTPUT),
+        ],
+        metadata={"icon": "frl", "description": "Filtro, regulador e lubrificador de ar"},
+    )
+
+    def update(dev: Device, dt: float):
+        p = dev.properties
+        entra = dev.read_port("in") or {}
+        p_in = float(entra.get("pressure_bar", 0.0)) if isinstance(entra, dict) else float(entra or 0)
+        p["inlet_pressure_bar"] = round(p_in, 3)
+        regulada = _num(p, "regulated_pressure_bar", 5.0)
+        # o regulador nunca entrega mais que o ajustado
+        p_out = min(p_in, regulada) if p_in > 0 else 0.0
+        p["outlet_pressure_bar"] = round(p_out, 3)
+        # filtro entope se a pressão de entrada for muito acima do ajuste
+        p["filter_clogged"] = p_in > regulada * 2.5
+        dev.write_port("out", {"pressure_bar": p_out, "flow_m3h": 12.0, "medium": "air"})
+        dev.state["error"] = p["filter_clogged"]
+        dev.state["error_msg"] = "filtro entupido" if p["filter_clogged"] else ""
+
+    dev.add_behaviour(Behaviour(name="prepare_air", trigger=Trigger.ON_TICK, action=update))
+    return dev
+
+
+def create_solenoid_valve() -> Device:
+    """
+    Válvula 3/2 solenoide — acionada por tensão (24VDC), retorno por mola.
+    É a ponte elétrica→pneumática: o CLP liga a bobina, o ar vai pro cilindro.
+    """
+    dev = Device(
+        type_id="valve_solenoid_3_2",
+        name="Válvula Solenoide 3/2",
+        category=DeviceCategory.ACTUATOR,
+        properties={
+            "coil_voltage_v": 24,
+            "energized": False,
+            "normally": "closed",   # closed = normalmente fechada
+            "manual_override": False,
+        },
+        ports=[
+            Port.digital_input("coil", "Bobina 24V"),
+            Port.pneumatic("in", "Alimentação", PortDirection.INPUT),
+            Port.pneumatic("out", "Saída", PortDirection.OUTPUT),
+            Port.pneumatic("exhaust", "Escape", PortDirection.OUTPUT),
+        ],
+        metadata={"icon": "solenoid", "description": "Válvula 3/2 solenoide com retorno por mola"},
+    )
+
+    def update(dev: Device, dt: float):
+        p = dev.properties
+        bobina = bool(dev.read_port("coil"))
+        override = bool(dev.properties.get("manual_override"))
+        p["energized"] = bobina or override
+        aberta = p["energized"] if p["normally"] == "closed" else not p["energized"]
+
+        entra = dev.read_port("in") or {}
+        p_in = float(entra.get("pressure_bar", 0.0)) if isinstance(entra, dict) else 0.0
+
+        if aberta and p_in > 0:
+            dev.write_port("out", {"pressure_bar": p_in, "flow_m3h": 8.0, "medium": "air"})
+            dev.write_port("exhaust", {"pressure_bar": 0.0, "flow_m3h": 0.0, "medium": "air"})
+        else:
+            dev.write_port("out", {"pressure_bar": 0.0, "flow_m3h": 0.0, "medium": "air"})
+            dev.write_port("exhaust", {"pressure_bar": p_in * 0.2, "flow_m3h": 0.5, "medium": "air"})
+        dev.state["active"] = p["energized"]
+
+    dev.add_behaviour(Behaviour(name="shift", trigger=Trigger.ON_TICK, action=update))
+    return dev
+
+
 FLUID_FACTORY = {
     "pump_centrifugal": create_pump,
     "pump_dosing": create_dosing_pump,
@@ -394,4 +528,7 @@ FLUID_FACTORY = {
     "duct": create_duct,
     "flange": create_flange,
     "tank": create_tank,
+    "air_source": create_air_source,
+    "frl": create_frl,
+    "valve_solenoid_3_2": create_solenoid_valve,
 }

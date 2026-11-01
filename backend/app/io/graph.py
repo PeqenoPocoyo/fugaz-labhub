@@ -131,7 +131,16 @@ class ConnectionGraph:
             value = from_port.value
             props = conn.properties
 
-            if conn.domain == PortDomain.ELECTRICAL:
+            # origem ainda não escreveu nada (1º tick, ou saída desligada):
+            # não há o que propagar — evita None * float
+            if value is None:
+                continue
+
+            # só perdas numéricas fazem sentido em valores escalares;
+            # pacotes (dict) passam direto (ex: {pressure_bar, flow_m3h})
+            escalar = isinstance(value, (int, float)) and not isinstance(value, bool)
+
+            if conn.domain == PortDomain.ELECTRICAL and escalar:
                 resistance = props.get("resistance", 0.0)
                 if resistance > 0 and from_port.data_type == PortDataType.ANALOG:
                     # Queda de tensão simplificada: V_out = V_in - I*R
@@ -139,7 +148,7 @@ class ConnectionGraph:
                     loss = props.get("loss_factor", 0.0)
                     value = value * (1 - loss)
 
-            if conn.domain == PortDomain.PNEUMATIC:
+            if conn.domain == PortDomain.PNEUMATIC and escalar:
                 diameter = props.get("diameter", 0.025)
                 length = props.get("length", 1.0)
                 # Perda de carga simplificada
@@ -147,7 +156,7 @@ class ConnectionGraph:
                 if from_port.data_type == PortDataType.PRESSURE:
                     value = value * (1 - loss)
 
-            if conn.domain == PortDomain.HYDRAULIC:
+            if conn.domain == PortDomain.HYDRAULIC and escalar:
                 loss = props.get("loss_factor", 0.1)
                 if from_port.data_type == PortDataType.PRESSURE:
                     value = value * (1 - loss)
