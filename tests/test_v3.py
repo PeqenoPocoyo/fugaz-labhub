@@ -335,3 +335,68 @@ def test_duct_scalable():
     d.update(1 / 60)
     assert d.properties["length_m"] == 8.0
     assert d.properties["flow_m3h"] == pytest.approx(20, abs=0.01)
+
+
+# ============================================================
+# POSICIONAMENTO — slots seguem o dispositivo
+# ============================================================
+
+def test_infra_slots_follow_device():
+    """Slots de montagem acompanham o transform do dispositivo dono."""
+    from app.devices.infrastructure import create_base_plate
+    bp = create_base_plate()
+    assert len(bp.slots) == 12
+    # na origem, slot coincide com o offset local
+    s0 = bp.slots[0]
+    assert list(s0.position) == list(s0.local_offset)
+
+    bp.place((-5.0, 0.5, -1.0))
+    # slot 0 do grid 4x3 spacing 1.0 = (-1.5, 0, -1.0) relativo
+    assert bp.slots[0].position == (-6.5, 0.5, -2.0)
+    assert bp.slots[-1].position == (-3.5, 0.5, 0.0)
+
+
+def test_conduit_path_follow_device():
+    """Trajeto do eletroduto/calha acompanha o dispositivo."""
+    from app.devices.infrastructure import create_cable_tray
+    tray = create_cable_tray()
+    local_first = list(tray.conduit_path[0])
+    tray.place((2.0, 0.3, 4.0))
+    assert tray.conduit_path[0] == (
+        local_first[0] + 2.0, local_first[1] + 0.3, local_first[2] + 4.0
+    )
+
+
+def test_drivetrain_uses_computed_ratio():
+    """Resolver calcula a razão pelos dentes, mesmo sem tick prévio."""
+    from app.sim.world import World
+    from app.devices.registry import registry
+    from app.devices.transmission import ratio_of
+
+    world = World()
+    vfd = registry.create("vfd_generic")
+    gears = registry.create("trans_gears")
+    conv = registry.create("conveyor_belt")
+    for d in (vfd, gears, conv):
+        world.add_node(d)
+
+    gears.properties["teeth_in"] = 10
+    gears.properties["teeth_out"] = 40
+    assert ratio_of(gears) == 4.0
+
+    world.link_drivetrain(vfd.id, conv.id, [gears.id])
+    vfd.properties["output_rpm"] = 1200
+    world.sim_running = True
+    world.resolve_drivetrains()
+
+    # 1200 rpm / 4 = 300 no eixo da carga
+    assert conv.properties["shaft_rpm"] == pytest.approx(300, abs=1)
+    # transmissão marcada como dirigida (behaviour próprio não sobrescreve)
+    assert gears.properties.get("_driven") is True
+    assert gears.properties["rpm_in"] == pytest.approx(1200, abs=1)
+    assert gears.properties["rpm_out"] == pytest.approx(300, abs=1)
+
+    # behaviour da engrenagem consome a flag e mantém os valores do resolver
+    gears.update(1 / 60)
+    assert gears.properties["rpm_in"] == pytest.approx(1200, abs=1)
+    assert gears.properties["_driven"] is False

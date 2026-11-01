@@ -130,8 +130,9 @@ def create_conduit() -> Device:
     )
     dev.layer = "infrastructure"
     dev.slots = []
-    # Trajeto do duto: waypoints que os cabos seguem
-    dev.conduit_path = _conduit_waypoints(2.0, origin=(0, 0, 0), axis="x")
+    # Trajeto do duto: waypoints que os cabos seguem (guarda cópia local)
+    dev._conduit_local = _conduit_waypoints(2.0, axis="x")
+    dev.conduit_path = list(dev._conduit_local)
     return dev
 
 
@@ -150,7 +151,8 @@ def create_cable_tray() -> Device:
     )
     dev.layer = "infrastructure"
     dev.slots = []
-    dev.conduit_path = _conduit_waypoints(2.0, origin=(0, 0, 0), axis="x", y=0.3)
+    dev._conduit_local = _conduit_waypoints(2.0, axis="x", y=0.3)
+    dev.conduit_path = list(dev._conduit_local)
     return dev
 
 
@@ -163,14 +165,14 @@ def _grid_slots(owner_id: str, cols: int, rows: int, spacing: float,
     """Grade de furos numa base plana."""
     accepts = accepts or [FixDomain.MECHANICAL]
     slots = []
-    ox, oy, oz = origin
     for r in range(rows):
         for c in range(cols):
-            x = ox + (c - (cols - 1) / 2) * spacing
-            z = oz + (r - (rows - 1) / 2) * spacing
+            off = ((c - (cols - 1) / 2) * spacing, 0.0,
+                   (r - (rows - 1) / 2) * spacing)
             slots.append(MountSlot(
                 id=f"{owner_id}_slot_{len(slots):02d}",
-                position=(x, oy, z),
+                position=off,
+                local_offset=off,
                 normal=(0, 1, 0),
                 accepts=accepts,
                 label=f"Furo {c},{r}",
@@ -183,19 +185,19 @@ def _line_slots(owner_id: str, length_m: float, count: int, origin: Vec3 = (0, 0
     """Slots igualmente espaçados ao longo de um eixo."""
     accepts = accepts or [FixDomain.MECHANICAL]
     slots = []
-    ox, oy, oz = origin
     for i in range(max(1, count)):
         t = i / max(1, count - 1) if count > 1 else 0.5
         d = (t - 0.5) * length_m
         if axis == "x":
-            pos = (ox + d, oy, oz)
+            off = (d, 0.0, 0.0)
         elif axis == "y":
-            pos = (ox, oy + d, oz)
+            off = (0.0, d, 0.0)
         else:
-            pos = (ox, oy, oz + d)
+            off = (0.0, 0.0, d)
         slots.append(MountSlot(
             id=f"{owner_id}_slot_{len(slots):02d}",
-            position=pos,
+            position=off,
+            local_offset=off,
             normal=(0, 1, 0) if axis != "y" else (1, 0, 0),
             accepts=accepts,
             label=f"Posição {i + 1}",
@@ -206,15 +208,14 @@ def _line_slots(owner_id: str, length_m: float, count: int, origin: Vec3 = (0, 0
 def _conduit_waypoints(length_m: float, origin: Vec3 = (0, 0, 0),
                        axis: str = "x", y: float = 0.0) -> List[Vec3]:
     """Trajeto (waypoints) por onde cabos correm dentro do duto/calha."""
-    ox, oy, oz = origin
     step = length_m / 6
     pts = []
     for i in range(7):
         d = (i - 3) * step
         if axis == "x":
-            pts.append((ox + d, oy + y, oz))
+            pts.append((d, y, 0.0))
         else:
-            pts.append((ox, oy + y, oz + d))
+            pts.append((0.0, y, d))
     return pts
 
 

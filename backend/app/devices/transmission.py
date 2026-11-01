@@ -47,6 +47,18 @@ def shaft_packet(rpm: float, torque_nm: float = 0.0, direction: int = 1) -> Dict
     return {"rpm": rpm, "torque_nm": torque_nm, "direction": direction}
 
 
+def _driven_by_drivetrain(dev: Device) -> bool:
+    """
+    True quando o resolvedor de trem de força já calculou esta transmissão
+    neste tick — o behaviour próprio deve apenas consumir a flag e seguir
+    os valores escritos pelo resolver (evita sobrescrever com eixo solto).
+    """
+    if dev.properties.get("_driven"):
+        dev.properties["_driven"] = False
+        return True
+    return False
+
+
 def _num(props: dict, key: str, default: float) -> float:
     v = props.get(key, default)
     if isinstance(v, dict):
@@ -90,6 +102,8 @@ def create_gears() -> Device:
     dev.fixations = []  # fixa por eixo, não por base
 
     def update(dev: Device, dt: float):
+        if _driven_by_drivetrain(dev):
+            return
         p = dev.properties
         z_in = float(_val(p, "teeth_in", 18))
         z_out = float(_val(p, "teeth_out", 54))
@@ -141,6 +155,8 @@ def create_belt() -> Device:
     dev.fixations = []
 
     def update(dev: Device, dt: float):
+        if _driven_by_drivetrain(dev):
+            return
         p = dev.properties
         d_in = float(_val(p, "pulley_d_in_mm", 60))
         d_out = float(_val(p, "pulley_d_out_mm", 180))
@@ -187,6 +203,8 @@ def create_chain() -> Device:
     dev.fixations = []
 
     def update(dev: Device, dt: float):
+        if _driven_by_drivetrain(dev):
+            return
         p = dev.properties
         z_in = float(_val(p, "sprocket_in", 15))
         z_out = float(_val(p, "sprocket_out", 45))
@@ -229,6 +247,8 @@ def create_coupling() -> Device:
     dev.fixations = []
 
     def update(dev: Device, dt: float):
+        if _driven_by_drivetrain(dev):
+            return
         p = dev.properties
         eff = float(_val(p, "efficiency", 0.99))
         s = read_shaft(dev)
@@ -273,6 +293,8 @@ def create_screw() -> Device:
     dev.fixations = []
 
     def update(dev: Device, dt: float):
+        if _driven_by_drivetrain(dev):
+            return
         p = dev.properties
         lead = float(_val(p, "lead_mm", 4.0))
         eff = float(_val(p, "efficiency", 0.85))
@@ -323,6 +345,8 @@ def create_linear_actuator() -> Device:
         "corpo", (0, 0, -0.15), (0, 0, -1), "mechanical", 0.2, "Corpo do atuador")]
 
     def update(dev: Device, dt: float):
+        if _driven_by_drivetrain(dev):
+            return
         p = dev.properties
         extend = dev.read_port("extend")
         retract = dev.read_port("retract")

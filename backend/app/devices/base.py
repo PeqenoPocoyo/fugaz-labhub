@@ -105,6 +105,23 @@ class Device:
         self.slots: List[Any] = []                # vagas (só infraestrutura)
         self.conduit_path: Any = None             # trajeto de duto/calha (só condução)
 
+    def place(self, position: tuple):
+        """
+        Posiciona o dispositivo e arrasta seus elementos dependentes
+        (slots de montagem e trajeto de duto/calha) junto — slots são
+        definidos em coordenadas relativas ao dispositivo.
+        """
+        px, py, pz = position
+        self.transform.position = (px, py, pz)
+        for slot in getattr(self, "slots", []):
+            lx, ly, lz = slot.local_offset
+            slot.position = (px + lx, py + ly, pz + lz)
+        cp = getattr(self, "conduit_path", None)
+        if cp and getattr(self, "_conduit_local", None):
+            self.conduit_path = [
+                (px + l[0], py + l[1], pz + l[2]) for l in self._conduit_local
+            ]
+
     # ---------- Portas ----------
 
     def add_port(self, port: Port):

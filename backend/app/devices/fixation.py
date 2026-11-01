@@ -72,11 +72,12 @@ class MountSlot:
     Ex: furo numa base plana, ranhura num perfilado, vaga num trilho DIN.
     """
     id: str
-    position: Vec3 = (0, 0, 0)       # posição MUNDIAL
+    position: Vec3 = (0, 0, 0)       # posição MUNDIAL (atualizada por Device.place)
     normal: Vec3 = (0, 1, 0)
     accepts: List[str] = field(default_factory=lambda: [FixDomain.MECHANICAL])
     occupied_by: Optional[str] = None  # device_id
     label: str = ""
+    local_offset: Vec3 = (0, 0, 0)   # offset relativo à origem do dispositivo dono
 
     def is_free(self) -> bool:
         return self.occupied_by is None

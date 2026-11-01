@@ -127,10 +127,14 @@ class World:
                 rpm = rpm / ratio if ratio > 0 else rpm
                 torque = torque * ratio * eff
                 chain.append({"type_id": trans.type_id, "ratio": round(ratio, 3)})
-                # espelha os valores vivos na transmissão (para UI)
+                # espelha os valores vivos na transmissão (para UI) e marca
+                # que ela está sendo dirigida pelo trem de força — o behaviour
+                # próprio então não sobrescreve com o eixo (desconectado)
                 trans.properties["rpm_in"] = round(rpm_in, 2)
                 trans.properties["rpm_out"] = round(rpm, 2)
+                trans.properties["ratio"] = round(ratio, 3)
                 trans.properties["torque_out_nm"] = round(torque, 3)
+                trans.properties["_driven"] = True
                 trans.write_port("shaft_out", {"rpm": rpm, "torque_nm": torque, "direction": 1})
 
             # escreve no eixo da carga (porta + propriedade)

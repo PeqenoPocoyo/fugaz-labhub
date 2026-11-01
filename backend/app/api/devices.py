@@ -55,9 +55,9 @@ async def spawn_device(req: SpawnRequest):
     device.layer = req.layer
     # Posição: explícita, ou próxima vaga em grade
     if req.position is not None and any(p != 0 for p in req.position):
-        device.transform.position = tuple(req.position)
+        device.place(tuple(req.position))
     else:
-        device.transform.position = state.engine.world.next_slot_position()
+        device.place(state.engine.world.next_slot_position())
     if req.properties:
         device.properties.update(req.properties)
 
@@ -89,7 +89,7 @@ async def update_device(device_id: str, req: UpdateRequest):
         device.properties.update(req.properties)
     if req.transform:
         if "position" in req.transform:
-            device.transform.position = tuple(req.transform["position"])
+            device.place(tuple(req.transform["position"]))
         if "rotation" in req.transform:
             device.transform.rotation = tuple(req.transform["rotation"])
         if "scale" in req.transform:
@@ -209,7 +209,7 @@ async def snap_magnetic(req: SnapRequest):
 
     slot = result["slot"]
     # Aplicar snap
-    device.transform.position = result["target_position"]
+    device.place(result["target_position"])
     slot.occupied_by = device.id
     world.version += 1
 
@@ -239,7 +239,7 @@ async def grid_snap(req: GridSnapRequest):
     if not device:
         raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
     mag = MagneticSystem(snap_enabled=True, grid_spacing=0.1)
-    device.transform.position = mag.snap_to_grid(device.transform.position)
+    device.place(mag.snap_to_grid(device.transform.position))
     return {"success": True, "position": list(device.transform.position)}
     clp_id: str
     in_slot: int
