@@ -159,3 +159,5 @@ Segregada em:
 
 *Última atualização: 28/10/2026 — Sandbox excluído, LABHUB principal mantido intacto*
 - 2026-10-31: publicacao inicial no GitHub (CI + sync script)
+
+- teste de passagem de argumento pelo alias
