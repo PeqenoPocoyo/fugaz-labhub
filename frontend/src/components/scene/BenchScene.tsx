@@ -15,6 +15,7 @@ import {
 } from './SceneElements'
 import { ModeloReceita } from './ModelKit'
 import { receitaPara } from './recipes'
+import { PortAnchors } from './PortAnchors'
 
 /** Sonda de performance — expõe o renderer para medir calls/triângulos */
 const PerfProbe: React.FC = () => {
@@ -146,11 +147,16 @@ interface BenchSceneProps {
   conduits: ConduitView[]
   drivetrains: DrivetrainView[]
   selectedId: string | null
+  fiaçãoDe: string | null
   onSelect: (id: string) => void
+  onIniciarFiação: (qualifiedId: string) => void
+  onConectar: (alvo: string) => void
+  onCancelarFiação: () => void
 }
 
 export const BenchScene: React.FC<BenchSceneProps> = ({
-  objects, connections, slots, conduits, drivetrains, selectedId, onSelect
+  objects, connections, slots, conduits, drivetrains, selectedId, fiaçãoDe,
+  onSelect, onIniciarFiação, onConectar, onCancelarFiação,
 }) => {
   const nodes = Object.entries(objects)
   const freeSlots = slots.filter(s => !s.occupied)
@@ -203,6 +209,15 @@ export const BenchScene: React.FC<BenchSceneProps> = ({
       {freeSlots.map(s => (
         <MagneticSnap key={s.id} position={s.position} label={s.label || undefined} />
       ))}
+
+      {/* Portas visíveis + pré-acoplamento (modo fiação) */}
+      <PortAnchors
+        objects={objects}
+        fiaçãoDe={fiaçãoDe}
+        onIniciarFiação={onIniciarFiação}
+        onConectar={onConectar}
+        onCancelar={onCancelarFiação}
+      />
 
       {/* Dispositivos — especializados têm malha própria */}
       {nodes.map(([id, obj]) => {

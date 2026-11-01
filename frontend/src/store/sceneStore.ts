@@ -3,10 +3,22 @@ import { create } from 'zustand'
 
 export type WireDomain = 'electrical' | 'pneumatic' | 'hydraulic' | 'data' | 'signal'
 
+export interface PortaObj {
+  id: string
+  name: string
+  direction: string
+  domain: string
+  value: any
+  connected_to: string | null
+  qualified_id?: string
+}
+
 export interface SceneObject {
   id: string
   type: string
   type_id?: string
+  ports?: Record<string, PortaObj>
+  port_anchors?: Record<string, number[]>
   position: [number, number, number]
   rotation: [number, number, number]
   scale: [number, number, number]

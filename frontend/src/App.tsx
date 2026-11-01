@@ -22,6 +22,8 @@ const App: React.FC = () => {
   const cameraNode = selectedId && objects[selectedId]?.type_id === 'camera_ip'
     ? objects[selectedId] : null
   const [view, setView] = React.useState<'bench' | 'commission'>('bench')
+  // fiação: porta de origem quando o usuário está conectando
+  const [fiaçãoDe, setFiaçãoDe] = React.useState<string | null>(null)
   const [dragOver, setDragOver] = React.useState(false)
   const [xrayLevel, setXrayLevel] = React.useState(1) // 1 = tudo visível
   const [simRunning, setSimRunning] = React.useState(false)
@@ -64,6 +66,27 @@ const App: React.FC = () => {
     e.preventDefault(); setDragOver(false)
     const typeId = e.dataTransfer.getData('deviceType')
     if (typeId) handleQuickAdd(typeId)
+  }
+
+  // ---------- fiação: cria conexão real entre duas portas ----------
+  const handleConectar = async (alvoQualified: string) => {
+    const origem = fiaçãoDe
+    if (!origem) return
+    try {
+      const r = await fetch('/api/world/connect', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from_port: origem, to_port: alvoQualified }),
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data?.detail || `HTTP ${r.status}`)
+      const c = data.connection
+      push({ severity: 'success', title: 'Fio criado', source: 'wire', detail: `${c.from_port} → ${c.to_port}` })
+      addLog('success', 'wire', `Conexão ${c.id} criada (${c.domain})`)
+      setFiaçãoDe(null)
+    } catch (e: any) {
+      push({ severity: 'error', title: 'Não conectou', source: 'wire', detail: String(e?.message || e) })
+      addLog('error', 'wire', `Falha ao conectar: ${String(e?.message || e)}`)
+    }
   }
 
   const toggleSim = () => {
@@ -157,7 +180,11 @@ const App: React.FC = () => {
               conduits={conduits}
               drivetrains={drivetrains}
               selectedId={selectedId}
+              fiaçãoDe={fiaçãoDe}
               onSelect={(id) => selectObject(id)}
+              onIniciarFiação={(q) => setFiaçãoDe(q)}
+              onConectar={handleConectar}
+              onCancelarFiação={() => setFiaçãoDe(null)}
             />
             <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
           </Canvas>

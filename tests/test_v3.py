@@ -307,6 +307,47 @@ def test_tank_level_rises_and_caps():
 
 
 # ============================================================
+# ÂNCORAS DAS PORTAS (3D)
+# ============================================================
+
+def test_port_anchors_autolayout():
+    """Portas ganham âncora 3D automática: entrada atrás, saída na frente."""
+    from app.devices.registry import registry
+    dev = registry.create("sensor_photoelectric")
+    d = dev.to_dict()
+    anchors = d["port_anchors"]
+    # entradas (pwr, test) recuadas em -X; saída (out) na frente +X
+    assert anchors["pwr"][0] < 0
+    assert anchors["test"][0] < 0
+    assert anchors["out"][0] > 0
+    # espalhadas verticalmente (não sobrepostas)
+    assert len({round(a[1], 4) for a in anchors.values()}) == len(anchors)
+
+
+def test_port_anchors_survive_respawn():
+    """Âncoras continuam estáveis entre chamadas de to_dict."""
+    from app.devices.registry import registry
+    dev = registry.create("motor_dc")
+    a1 = dev.to_dict()["port_anchors"]
+    a2 = dev.to_dict()["port_anchors"]
+    assert a1 == a2
+
+
+def test_receptor_completa_par_barreira():
+    """Receptor fotoelétrico fecha o par do sensor."""
+    from app.devices.registry import registry
+    r = registry.create("sensor_photoelectric_receptor")
+    assert r.type_id == "sensor_photoelectric_receptor"
+    assert "out" in r.ports
+    assert "align_cmd" in r.ports
+    # sem emissor pareado: nunca detecta
+    r.on_start()
+    r.write_port("out", None)
+    r.update(1 / 60)
+    assert r.properties["object_detected"] is False
+
+
+# ============================================================
 # REGISTRY
 # ============================================================
 

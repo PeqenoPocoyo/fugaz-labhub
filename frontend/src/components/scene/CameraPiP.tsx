@@ -123,7 +123,11 @@ export const CameraPiP: React.FC<CameraPiPProps> = ({
           conduits={conduits}
           drivetrains={drivetrains}
           selectedId={null}
+          fiaçãoDe={null}
           onSelect={() => {}}
+          onIniciarFiação={() => {}}
+          onConectar={() => {}}
+          onCancelarFiação={() => {}}
         />
       </Canvas>
 

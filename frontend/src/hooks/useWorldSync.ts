@@ -10,11 +10,12 @@ interface WorldNode {
   transform: { position: number[]; rotation: number[]; scale: number[] }
   properties: Record<string, any>
   layer: string
-  ports: Record<string, any>
+  ports?: Record<string, any>
   fixations?: any[]
   slots?: any[]
   conduit_path?: number[][] | null
   type_id?: string
+  port_anchors?: Record<string, number[]>
 }
 
 interface WorldConnection {
@@ -84,6 +85,8 @@ export const useWorldSync = (enabled = true, intervalMs = POLL_MS) => {
           properties: n.properties || {},
           layer: n.layer || 'devices',
           category: n.category || 'other',
+          ports: n.ports || {},
+          port_anchors: n.port_anchors || {},
         }
       }
 
@@ -92,25 +95,32 @@ export const useWorldSync = (enabled = true, intervalMs = POLL_MS) => {
         if (!nodes[id]) indexRef.current.delete(id)
       }
 
-      // Conexões reais → fios ligam as BORDAS dos blocos (não o centro)
-      const positions: Record<string, [number, number, number]> = {}
-      for (const [id, o] of Object.entries(objs)) positions[id] = o.position
+      // Conexões reais → fios nascem nas ÂNCORAS das portas (não no centro)
+      const anchorDe = (deviceId: string, portQualified: string): [number, number, number] | null => {
+        const dev = objs[deviceId]
+        if (!dev) return null
+        const ports = dev.ports || {}
+        // casamento pelo qualified_id; fallback: extrai o sufixo do port id
+        const alvo = Object.entries(ports).find(
+          ([, p]) => (p as any).qualified_id === portQualified
+        )
+        const portId = alvo ? alvo[0] : portQualified.replace(`${deviceId}_`, '')
+        const a = dev.port_anchors?.[portId]
+        const base = dev.position
+        return a
+          ? [base[0] + a[0], base[1] + a[1], base[2] + a[2]]
+          : [base[0], base[1] + 0.1, base[2]]
+      }
 
       const wires: Connection[] = conns
         .map(c => {
-          const a = positions[c.from_device]
-          const b = positions[c.to_device]
+          const a = anchorDe(c.from_device, c.from_port)
+          const b = anchorDe(c.to_device, c.to_port)
           if (!a || !b) return null
-          // Direção normalizada A→B
-          let dx = b[0] - a[0], dz = b[2] - a[2]
-          const len = Math.hypot(dx, dz) || 1
-          dx /= len; dz /= len
-          // Recua 0.4 de cada lado para fora do bloco
-          const inset = 0.4
           return {
             id: c.id,
-            from: [a[0] + dx * inset, a[1] + 0.1, a[2] + dz * inset] as [number, number, number],
-            to: [b[0] - dx * inset, b[1] + 0.1, b[2] - dz * inset] as [number, number, number],
+            from: a as [number, number, number],
+            to: b as [number, number, number],
             domain: (c.domain || 'signal') as any,
             properties: c.properties || {},
           }

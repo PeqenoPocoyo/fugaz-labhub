@@ -93,6 +93,9 @@ class Device:
         self.ports: Dict[str, Port] = {}
         for p in (ports or []):
             self.add_port(p)
+        # Âncora 3D de cada porta (offset LOCAL relativo à origem do dispositivo).
+        # Fonte única de verdade: o modelo 3D e a fiação usam a mesma posição.
+        self.port_anchors: Dict[str, tuple] = {}
         self.properties: Dict[str, Any] = properties or {}
         self.state: Dict[str, Any] = {"active": False, "powered": False, "error": False, "error_msg": ""}
         self.behaviours: List[Behaviour] = behaviours or []
@@ -121,6 +124,42 @@ class Device:
             self.conduit_path = [
                 (px + l[0], py + l[1], pz + l[2]) for l in self._conduit_local
             ]
+
+    # ---------- Âncoras das portas ----------
+
+    def layout_portas(self, raio: float = 0.35):
+        """
+        Distribui as portas ao redor do dispositivo quando o tipo não
+        declara âncoras explícitas. Convenção: entradas p/ trás (-X),
+        saídas p/ frente (+X), alimentação em cima (+Y), dados atrás (-Z).
+        """
+        if self.port_anchors:
+            return
+        grupos = {"input": [], "output": [], "power": [], "bidirectional": []}
+        for pid, port in self.ports.items():
+            grupo = port.direction.value if port.direction.value in grupos else "bidirectional"
+            grupos[grupo].append(pid)
+
+        def espalhar(ids: List[str], eixo: str, sinal: float, base: tuple):
+            for i, pid in enumerate(ids):
+                t = (i + 0.5) / max(1, len(ids))
+                x, y, z = base
+                if eixo == "x":
+                    y = (t - 0.5) * raio
+                elif eixo == "y":
+                    x = (t - 0.5) * raio
+                else:
+                    x = (t - 0.5) * raio
+                self.port_anchors[pid] = (
+                    x + sinal * raio if eixo == "x" else x,
+                    y + sinal * 0.45 if eixo == "y" else y,
+                    z + sinal * raio if eixo == "z" else z,
+                )
+
+        espalhar(grupos["input"], "x", -1, (0, 0, 0))
+        espalhar(grupos["output"], "x", +1, (0, 0, 0))
+        espalhar(grupos["power"], "y", +1, (0, 0, 0))
+        espalhar(grupos["bidirectional"], "z", -1, (0, -0.1, 0))
 
     # ---------- Portas ----------
 
@@ -207,6 +246,9 @@ class Device:
     # ---------- Serialização ----------
 
     def to_dict(self) -> dict:
+        # garante âncoras das portas (auto-layout se o tipo não declarou)
+        if self.ports and not self.port_anchors:
+            self.layout_portas()
         return {
             "id": self.id,
             "type_id": self.type_id,
@@ -222,6 +264,8 @@ class Device:
             "fixations": [f.to_dict() for f in self.fixations],
             "slots": [s.to_dict() for s in self.slots],
             "conduit_path": [list(p) for p in self.conduit_path] if self.conduit_path else None,
+            # Âncora 3D de cada porta (offset local ao dispositivo)
+            "port_anchors": {k: list(v) for k, v in self.port_anchors.items()},
         }
 
     def __repr__(self):
