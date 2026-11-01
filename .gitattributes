@@ -1,0 +1,17 @@
+# Normalização de line endings (evita warning LF→CRLF no Windows)
+* text=auto eol=crlf
+
+# Arquivos que devem manter LF
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binários (nunca normalizar)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

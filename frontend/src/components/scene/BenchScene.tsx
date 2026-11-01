@@ -1,0 +1,188 @@
+// BenchScene — Bancada: dispositivos + fios vivos + anéis magnéticos + dutos/calhas
+// + malhas especializadas (esteiras escaláveis, transmissões, visão, fluidos)
+// + ligações mecânicas do trem de força.
+// Recebe tudo por PROPS (App assina a store) — evita problema de reconciler R3F.
+import React, { useRef } from 'react'
+import { Html } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
+import { SceneObject, MountSlotView, ConduitView, Connection, DrivetrainView } from '../../store/sceneStore'
+import { LiveWire, WireDomain } from './LiveWire'
+import { MagneticSnap } from './MagneticSnap'
+import { ConduitRun } from './ConduitRun'
+import {
+  ConveyorMesh, RollerConveyorMesh, TransmissionMesh, TapeMesh, MarkerMesh,
+  TargetMesh, CornerMesh, DuctMesh, PumpMesh, ValveMesh, TankMesh, MechanicalBond,
+} from './SceneElements'
+
+const CAT_COLOR: Record<string, string> = {
+  plc: '#00D4FF', sensor: '#66BB6A', actuator: '#FFA726', drive: '#AB47BC',
+  structure: '#6B7787', vision: '#FFCA28', mass: '#EC407A', power: '#FFB300',
+  transmission: '#FF7043',
+}
+
+/** Tipos com malha própria (não renderizam o bloco genérico) */
+const SPECIALIZED: Record<string, React.FC<{ obj: SceneObject }>> = {
+  conveyor_belt: ConveyorMesh,
+  conveyor_roller: RollerConveyorMesh,
+  trans_gears: TransmissionMesh,
+  trans_belt: TransmissionMesh,
+  trans_chain: TransmissionMesh,
+  trans_coupling: TransmissionMesh,
+  trans_screw: TransmissionMesh,
+  trans_linear_actuator: TransmissionMesh,
+  vision_tape: TapeMesh,
+  vision_marker: MarkerMesh,
+  vision_target: TargetMesh,
+  vision_corner: CornerMesh,
+  duct: DuctMesh,
+  pump_centrifugal: PumpMesh,
+  pump_dosing: PumpMesh,
+  valve_control: ValveMesh,
+  tank: TankMesh,
+}
+
+/** Mapeia domínio do backend para WireDomain do fio */
+function toWireDomain(d: string): WireDomain {
+  if (['electrical', 'pneumatic', 'hydraulic', 'data'].includes(d)) return d as WireDomain
+  return 'signal'
+}
+
+const NodeMesh: React.FC<{ id: string; obj: SceneObject; onSelect: (id: string) => void; selected: boolean }> = ({ id, obj, onSelect, selected }) => {
+  const ref = useRef<any>(null)
+  const color = CAT_COLOR[obj.category || ''] || '#6B7787'
+  const [px, py, pz] = obj.position
+  const [sx, sy, sz] = obj.scale
+
+  useFrame((s) => {
+    if (ref.current && selected) {
+      ref.current.position.y = py + Math.sin(s.clock.elapsedTime * 3) * 0.03
+    }
+  })
+
+  return (
+    <group>
+      <group position={[px, py, pz]} rotation={obj.rotation}>
+        {/* Sombra de contato no chão */}
+        <mesh position={[0, -py + 0.011, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <planeGeometry args={[sx * 1.4, sz * 1.4]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.35} />
+        </mesh>
+
+        <mesh
+          ref={ref}
+          onClick={(e) => { e.stopPropagation(); onSelect(id) }}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[sx, sy, sz]} />
+          <meshStandardMaterial
+            color={color}
+            metalness={0.6}
+            roughness={0.35}
+            emissive={selected ? '#00E5FF' : color}
+            emissiveIntensity={selected ? 0.4 : 0.07}
+          />
+        </mesh>
+
+        {/* Aro de seleção no chão */}
+        {selected && (
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -py + 0.02, 0]}>
+            <ringGeometry args={[Math.max(sx, sz) * 0.85, Math.max(sx, sz) * 1.0, 40]} />
+            <meshBasicMaterial color="#00E5FF" transparent opacity={0.55} side={2} />
+          </mesh>
+        )}
+
+        {/* Etiqueta flutuante */}
+        <Html position={[0, sy / 2 + 0.22, 0]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
+          <div className="flex items-center gap-1 bg-[#141922]/85 border border-[#232C38] rounded px-1.5 py-0.5 whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-sm" style={{ background: color }} />
+            <span className="text-[9px] font-mono text-[#D7DEE8]">{String(obj.type).slice(0, 16)}</span>
+          </div>
+        </Html>
+      </group>
+    </group>
+  )
+}
+
+interface BenchSceneProps {
+  objects: Record<string, SceneObject>
+  connections: Connection[]
+  slots: MountSlotView[]
+  conduits: ConduitView[]
+  drivetrains: DrivetrainView[]
+  selectedId: string | null
+  onSelect: (id: string) => void
+}
+
+export const BenchScene: React.FC<BenchSceneProps> = ({
+  objects, connections, slots, conduits, drivetrains, selectedId, onSelect
+}) => {
+  const nodes = Object.entries(objects)
+  const freeSlots = slots.filter(s => !s.occupied)
+
+  // Ligações mecânicas do trem de força (fonte → transmissões → carga)
+  const bonds = drivetrains.map(d => {
+    const src = objects[d.source_id]
+    const tgt = objects[d.target_id]
+    if (!src || !tgt) return null
+    const via = d.transmissions
+      .map(tid => objects[tid])
+      .filter(Boolean)
+      .map(o => o.position)
+    // razão total = produto das razões das transmissões
+    let ratio = 1
+    for (const t of d.transmissions) {
+      const o = objects[t]
+      if (o && o.properties?.ratio) ratio *= Number(o.properties.ratio) || 1
+    }
+    return { id: d.id, src: src.position, via, tgt: tgt.position, ratio }
+  }).filter(Boolean) as any[]
+
+  return (
+    <group onClick={() => onSelect('')}>
+      {/* Dutos e calhas (infra de condução) */}
+      {conduits.map(c => (
+        <ConduitRun key={c.id} path={c.path} kind={c.kind as any} />
+      ))}
+
+      {/* Ligações mecânicas (trem de força) */}
+      {bonds.map(b => (
+        <MechanicalBond key={b.id} from={b.src} via={b.via} to={b.tgt} ratio={b.ratio} />
+      ))}
+
+      {/* Fios vivos (conexões reais) */}
+      {connections.map(c => (
+        <LiveWire
+          key={c.id}
+          from={c.from}
+          to={c.to}
+          domain={toWireDomain(c.domain)}
+          active
+          gauge={c.domain === 'hydraulic' ? 1.6 : c.domain === 'data' ? 0.6 : 1}
+        />
+      ))}
+
+      {/* Anéis magnéticos nos slots LIVRES (convite ao encaixe) */}
+      {freeSlots.map(s => (
+        <MagneticSnap key={s.id} position={s.position} label={s.label || undefined} />
+      ))}
+
+      {/* Dispositivos — especializados têm malha própria */}
+      {nodes.map(([id, obj]) => {
+        const Special = obj.type_id ? SPECIALIZED[obj.type_id] : undefined
+        if (Special) return <Special key={id} obj={obj} />
+        return (
+          <NodeMesh
+            key={id}
+            id={id}
+            obj={obj}
+            onSelect={onSelect}
+            selected={selectedId === id}
+          />
+        )
+      })}
+    </group>
+  )
+}
+
+export default BenchScene

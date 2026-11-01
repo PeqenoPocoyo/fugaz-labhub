@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import './tokens.css';
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  width: 100%; height: 100%;
+  background: var(--fz-bg);
+  color: var(--fz-text);
+  font-family: var(--fz-font-ui);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Foco acessível com anel ciano elétrico */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--fz-glow-focus);
+  border-radius: var(--fz-radius-sm);
+}
+
+/* Scrollbar industrial */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--fz-bg); }
+::-webkit-scrollbar-thumb {
+  background: var(--fz-border);
+  border: 2px solid var(--fz-bg);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--fz-border-hi); }
+
+/* Classes base */
+.fz-panel {
+  background: var(--fz-surface);
+  border: 1px solid var(--fz-border);
+  border-radius: var(--fz-radius);
+}
+
+.fz-label {
+  font-family: var(--fz-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fz-text-dim);
+}
+
+.fz-value {
+  font-family: var(--fz-font-mono);
+  font-size: 12px;
+  color: var(--fz-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.fz-display {
+  font-family: var(--fz-font-display);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}

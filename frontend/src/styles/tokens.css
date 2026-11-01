@@ -1,0 +1,132 @@
+/* ============================================================
+   FUGAZ LABHUB — DESIGN TOKENS
+   Paleta industrial: grafite de oficina + sinalização de segurança
+   ============================================================ */
+
+:root {
+  /* ---- Superfícies (grafite → aço) ---- */
+  --fz-bg: #0B0E13;          /* grafite fosco */
+  --fz-surface: #141922;     /* aço escovado */
+  --fz-surface-2: #1A2130;   /* aço elevado */
+  --fz-border: #232C38;      /* reborda metalizada */
+  --fz-border-hi: #34404F;   /* reborda destacada */
+
+  /* ---- Texto (alumínio → aço envelhecido) ---- */
+  --fz-text: #D7DEE8;
+  --fz-text-dim: #6B7787;
+  --fz-text-bright: #FFFFFF;
+
+  /* ---- Sinalização industrial ---- */
+  --fz-elec: #FFB300;        /* elétrica (âmbar) */
+  --fz-pneu: #29B6F6;        /* pneumática (azul claro) */
+  --fz-hydr: #26C6DA;        /* hidráulica (ciano) */
+  --fz-data: #AB47BC;        /* dados (violeta) */
+  --fz-digital: #66BB6A;     /* digital ligado (verde) */
+  --fz-analog: #FFA726;      /* analógico (laranja) */
+
+  /* ---- Severidade ---- */
+  --fz-error: #EF5350;       /* perigo */
+  --fz-warn: #FFCA28;        /* atenção */
+  --fz-success: #26A69A;     /* verde-água */
+  --fz-info: #42A5F5;        /* informação */
+
+  /* ---- Foco / seleção ---- */
+  --fz-focus: #00E5FF;       /* ciano elétrico */
+  --fz-focus-glow: rgba(0, 229, 255, 0.35);
+
+  /* ---- Categorias de dispositivo ---- */
+  --fz-cat-plc: #00D4FF;
+  --fz-cat-sensor: #66BB6A;
+  --fz-cat-actuator: #FFA726;
+  --fz-cat-drive: #AB47BC;
+  --fz-cat-structure: #6B7787;
+  --fz-cat-mass: #EC407A;
+  --fz-cat-vision: #FFCA28;
+
+  /* ---- Ritmo (escala 4px) ---- */
+  --fz-space-1: 4px;
+  --fz-space-2: 8px;
+  --fz-space-3: 12px;
+  --fz-space-4: 16px;
+  --fz-space-5: 20px;
+  --fz-space-6: 24px;
+  --fz-space-8: 32px;
+
+  /* ---- Cantos (industrial, não apple) ---- */
+  --fz-radius-sm: 3px;
+  --fz-radius: 5px;
+  --fz-radius-lg: 8px;
+
+  /* ---- Tipografia ---- */
+  --fz-font-display: 'Barlow Condensed', 'Saira', sans-serif;
+  --fz-font-ui: 'Inter', sans-serif;
+  --fz-font-mono: 'JetBrains Mono', monospace;
+
+  /* ---- Sombras (contato físico, não blur suave) ---- */
+  --fz-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.4);
+  --fz-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --fz-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --fz-glow-focus: 0 0 0 2px var(--fz-focus-glow), 0 0 12px var(--fz-focus-glow);
+
+  /* ---- Transição (easing industrial) ---- */
+  --fz-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --fz-ease-snap: cubic-bezier(0.34, 1.56, 0.64, 1); /* snap elástico */
+
+  /* ---- Z-index ---- */
+  --fz-z-drawer: 40;
+  --fz-z-console: 50;
+  --fz-z-card: 60;
+  --fz-z-toast: 70;
+  --fz-z-tooltip: 80;
+}
+
+/* ---- Utilitários de domínio (cores de sinal) ---- */
+.fz-dom-elec  { --fz-dom: var(--fz-elec); }
+.fz-dom-pneu  { --fz-dom: var(--fz-pneu); }
+.fz-dom-hydr  { --fz-dom: var(--fz-hydr); }
+.fz-dom-data  { --fz-dom: var(--fz-data); }
+
+/* ---- Animações de sinal (pulso que percorre) ---- */
+@keyframes fz-pulse-flow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes fz-breathe {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 1; }
+}
+
+@keyframes fz-snap-in {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+@keyframes fz-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+@keyframes fz-slide-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fz-drawer-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+/* Fio vivo: gradiente que percorre */
+.fz-wire {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--fz-dom) 40%,
+    var(--fz-dom) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: fz-pulse-flow 1s linear infinite;
+}

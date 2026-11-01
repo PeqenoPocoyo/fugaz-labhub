@@ -1,0 +1,59 @@
+# ============================================================
+# FUGAZ LABHUB — .gitignore
+# ============================================================
+
+# --- Dependências ---
+node_modules/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- Build / dist ---
+dist/
+build/
+*.tsbuildinfo
+.vite/
+
+# --- Ambiente e segredos (NUNCA commitar) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+
+# --- Caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# --- Logs e runtime ---
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- SO / editores ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# --- Python virtualenvs ---
+pip-wheel-metadata/
+
+# --- Temporários ---
+tmp/
+temp/
+*.tmp
+*.bak
