@@ -57,3 +57,7 @@ tmp/
 temp/
 *.tmp
 *.bak
+
+# build de preview servido localmente (regeneravel)
+docs/labhub-preview/
+
