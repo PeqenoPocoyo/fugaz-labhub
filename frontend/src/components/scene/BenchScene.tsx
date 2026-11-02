@@ -2,7 +2,7 @@
 // + malhas especializadas (esteiras escaláveis, transmissões, visão, fluidos)
 // + ligações mecânicas do trem de força.
 // Recebe tudo por PROPS (App assina a store) — evita problema de reconciler R3F.
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useCallback } from 'react'
 import { Html } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -16,6 +16,7 @@ import {
 } from './SceneElements'
 import { ModeloReceita } from './ModelKit'
 import { receitaPara } from './recipes'
+import { ligarSombras } from './EnvironmentLight'
 import { PortAnchors } from './PortAnchors'
 import { WireGrab } from './WireGrab'
 
@@ -85,7 +86,10 @@ const RecipeMesh: React.FC<{
   return (
     <group position={obj.position} rotation={rad}>
       {/* toda a peça é clicável (evento sobe das malhas filhas) */}
-      <group onClick={(e) => { e.stopPropagation(); onSelect(obj.id) }}>
+      <group
+        ref={useCallback((g: THREE.Group | null) => ligarSombras(g), [])}
+        onClick={(e) => { e.stopPropagation(); onSelect(obj.id) }}
+      >
         <ModeloReceita receita={receita} onPortDown={onPortDown} onPortClick={onPortClick} />
       </group>
       {/* etiqueta flutuante */}
@@ -104,6 +108,52 @@ const RecipeMesh: React.FC<{
 function toWireDomain(d: string): WireDomain {
   if (['electrical', 'pneumatic', 'hydraulic', 'data'].includes(d)) return d as WireDomain
   return 'signal'
+}
+
+/**
+ * Embrulho das malhas especializadas (esteiras, transmissões, dutos, bombas...).
+ * Sem isso, ConveyorMesh/TransmissionMesh renderizavam soltos — sem clique,
+ * sem etiqueta e sem realce de seleção, então era IMPOSSÍVEL selecionar e mover
+ * uma esteira ou uma engrenagem. Aqui a peça inteira fica clicável (o evento
+ * sobe das malhas filhas) e ganha a mesma etiqueta/realce do RecipeMesh.
+ */
+const SpecializedWrapper: React.FC<{
+  obj: SceneObject; selected: boolean
+  onSelect: (id: string) => void
+  children: React.ReactNode
+}> = ({ obj, selected, onSelect, children }) => {
+  // altura da etiqueta: peças altas (transmissões) precisam de mais espaço
+  const altos = ['trans_gears', 'trans_belt', 'trans_chain', 'trans_coupling',
+    'trans_screw', 'trans_linear_actuator', 'conveyor_belt', 'conveyor_roller']
+  const etiquetaY = altos.includes(obj.type_id || '') ? 0.42 : 0.62
+
+  return (
+    <group>
+      {/* a peça inteira é clicável; para o drag da câmera */}
+      <group
+        ref={useCallback((g: THREE.Group | null) => ligarSombras(g), [])}
+        onClick={(e) => { e.stopPropagation(); onSelect(obj.id) }}
+      >
+        {children}
+      </group>
+      {/* realce de seleção no chão (anel) */}
+      {selected && (
+        <group position={[obj.position[0], obj.position[1], obj.position[2]]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -obj.position[1] + 0.014, 0]}>
+            <ringGeometry args={[0.55, 0.62, 40]} />
+            <meshBasicMaterial color="#00B4D8" transparent opacity={0.9} side={THREE.DoubleSide} depthWrite={false} />
+          </mesh>
+        </group>
+      )}
+      <Html position={[obj.position[0], obj.position[1] + etiquetaY, obj.position[2]]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
+        <div className="flex items-center gap-1 bg-[#141922]/85 border rounded px-1.5 py-0.5 whitespace-nowrap"
+          style={{ borderColor: selected ? '#00E5FF' : '#232C38' }}>
+          <span className="w-1.5 h-1.5 rounded-sm" style={{ background: selected ? '#00E5FF' : '#6B7787' }} />
+          <span className="text-[9px] font-mono text-[#D7DEE8]">{String(obj.type).slice(0, 16)}</span>
+        </div>
+      </Html>
+    </group>
+  )
 }
 
 const NodeMesh: React.FC<{ id: string; obj: SceneObject; onSelect: (id: string) => void; selected: boolean }> = ({ id, obj, onSelect, selected }) => {
@@ -257,7 +307,11 @@ export const BenchScene: React.FC<BenchSceneProps> = ({
       {/* Dispositivos — especializados têm malha própria */}
       {nodes.map(([id, obj]) => {
         const Special = obj.type_id ? SPECIALIZED[obj.type_id] : undefined
-        if (Special) return <Special key={id} obj={obj} />
+        if (Special) return (
+          <SpecializedWrapper key={id} obj={obj} selected={selectedId === id} onSelect={onSelect}>
+            <Special obj={obj} />
+          </SpecializedWrapper>
+        )
         if (obj.type_id && RECIPE_TYPES.includes(obj.type_id)) {
           return (
             <RecipeMesh

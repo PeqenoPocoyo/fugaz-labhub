@@ -15,7 +15,8 @@ import { BenchScene } from './components/scene/BenchScene'
 import { Placement } from './components/scene/Placement'
 import { FrameController } from './components/scene/FrameController'
 import { CameraLock } from './components/scene/CameraLock'
-import { SceneCamera, FactoryControls } from './components/scene/SceneCamera'
+import { SceneCamera, FactoryControls, CameraGuard } from './components/scene/SceneCamera'
+import { EnvironmentLight } from './components/scene/EnvironmentLight'
 import { bornesDe } from './components/scene/recipes'
 import { CameraPiP } from './components/scene/CameraPiP'
 import { CommandPalette } from './components/command/CommandPalette'
@@ -327,17 +328,46 @@ const App: React.FC = () => {
         /* o botão direito gira a câmera: não abre o menu de contexto */
         onContextMenu={e => e.preventDefault()}>
 
-        <Canvas className="w-full h-full" camera={{ position: [8, 7, 8], fov: 45 }}>
+        <Canvas
+          className="w-full h-full"
+          camera={{ position: [8, 7, 8], fov: 45 }}
+          shadows={{ type: THREE.PCFSoftShadowMap }}
+          gl={{ antialias: true, powerPreference: 'high-performance' }}
+          onCreated={({ gl }) => {
+            gl.toneMapping = THREE.ACESFilmicToneMapping
+            gl.toneMappingExposure = 1.15
+          }}
+        >
           <PerspectiveCamera makeDefault position={[8, 7, 8]} fov={45} />
-          <ambientLight intensity={0.4} />
-          <directionalLight position={[8, 12, 6]} intensity={0.85} />
-          <hemisphereLight args={['#1A2130', '#0B0E13', 0.45]} />
+
+          {/* ILUMINAÇÃO de laboratório — 3 pontos para o metal ter leitura.
+              Antes: uma única direcional + ambiente fraco deixava tudo chapado
+              e escuro, porque metal sem ambiente REFLETE PRETO. A ambiente
+              fraca acima resolve exatamente isso (ver EnvironmentLight). */}
+          <ambientLight intensity={0.55} />
+          {/* chave: vinda de cima, projeta sombra (dá apoio no chão) */}
+          <directionalLight
+            position={[9, 14, 7]}
+            intensity={1.35}
+            castShadow
+            shadow-mapSize-width={1024}
+            shadow-mapSize-height={1024}
+            shadow-camera-left={-18}
+            shadow-camera-right={18}
+            shadow-camera-top={18}
+            shadow-camera-bottom={-18}
+            shadow-bias={-0.0005}
+          />
+          {/* preenchimento do lado oposto (tira o preto do outro lado) */}
+          <directionalLight position={[-8, 6, -5]} intensity={0.42} color="#C9D8EE" />
+          {/* rebatedor baixo (simula o bounce do piso de concreto) */}
+          <hemisphereLight args={['#2C3A52', '#121821', 0.55]} />
 
           {/* CHÃO DA CELA — sempre visível, mesmo vazio.
               Plano escuro (dá "piso") + grade legível + eixos na origem. */}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
             <planeGeometry args={[60, 60]} />
-            <meshStandardMaterial color="#121821" roughness={0.94} metalness={0.05} />
+            <meshStandardMaterial color="#151C26" roughness={0.88} metalness={0.12} />
           </mesh>
           <Grid
             args={[60, 60]}
@@ -382,8 +412,10 @@ const App: React.FC = () => {
             onRot={() => {}}
           />
           <FrameController objects={objects} selecionado={selectedId} />
+          <EnvironmentLight />
           <CameraLock />
           <SceneCamera />
+          <CameraGuard />
           {/* controles no gesto Factory I/O (substitui o OrbitControls antigo) */}
           <FactoryControls />
         </Canvas>

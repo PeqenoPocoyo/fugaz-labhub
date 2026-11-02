@@ -637,8 +637,12 @@ export const TransmissionMesh: React.FC<{ obj: SceneObject }> = ({ obj }) => {
   /* ---------- PAR DE ENGRENAGENS (padrão) ---------- */
   const zIn = Math.max(6, Math.round(num(prop(obj, 'teeth_in', 18), 18)))
   const zOut = Math.max(6, Math.round(num(prop(obj, 'teeth_out', 54), 54)))
-  // módulo derivado do número de dentes: raios proporcionais, malha real
-  const module = Math.min(0.0045, 0.27 / (zIn + zOut))
+  // Módulo calibrado para o trem de força caber na esteira: a engrenagem
+  // maior fica com ~0,11 m de raio (22 cm de diâmetro) e o par inteiro
+  // ocupa ~0,35 m — proporcional a uma esteira de 3 m. O módulo antigo
+  // (0,27/(z1+z2) ≈ 0,0037) fazia a engrenagem maior ter 24 cm de raio e
+  // o conjunto competir visualmente com a própria esteira.
+  const module = Math.min(0.0032, 0.20 / (zIn + zOut))
   const rIn = (module * zIn) / 2
   const rOut = (module * zOut) / 2
   const dist = rIn + rOut

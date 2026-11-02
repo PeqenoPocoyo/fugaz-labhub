@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FUGAZ LABHUB — Verificacao de Geometria das Transmissoes</title>
+<style>
+  :root{
+    --bg:#0B0E13; --painel:#141922; --linha:#232C38; --txt:#D7DEE8;
+    --fraco:#6B7787; --ok:#3FB950; --erro:#E53935; --destaque:#00B4D8; --eng:#FFCA28;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 "Segoe UI",system-ui,sans-serif;min-height:100vh}
+  header{padding:18px 22px;border-bottom:1px solid var(--linha);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .logo{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:.08em;font-size:15px}
+  .ponto{width:9px;height:9px;border-radius:2px;background:var(--destaque);box-shadow:0 0 10px var(--destaque)}
+  h1{font-size:15px;font-weight:600;margin:0;color:var(--fraco)}
+  .wrap{display:grid;grid-template-columns:300px 1fr;gap:18px;padding:18px 22px}
+  @media (max-width:900px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--painel);border:1px solid var(--linha);border-radius:10px;padding:14px}
+  .card h2{margin:0 0 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--fraco)}
+  label{display:block;font-size:12px;color:var(--fraco);margin:12px 0 4px}
+  input[type=range]{width:100%;accent-color:var(--destaque)}
+  .val{float:right;font-family:ui-monospace,monospace;color:var(--txt)}
+  select{width:100%;background:#0E131A;color:var(--txt);border:1px solid var(--linha);border-radius:6px;padding:7px;font-size:13px}
+  canvas{width:100%;height:auto;display:block;background:#0E131A;border-radius:8px}
+  .metricas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}
+  .met{background:#0E131A;border:1px solid var(--linha);border-radius:8px;padding:10px}
+  .met b{display:block;font-size:20px;font-family:ui-monospace,monospace;font-weight:600}
+  .met span{font-size:11px;color:var(--fraco)}
+  .ok{color:var(--ok)} .erro{color:var(--erro)}
+  .nota{font-size:12px;color:var(--fraco);margin-top:12px;line-height:1.6}
+  .legenda{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--fraco);margin-top:10px}
+  .legenda i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><span class="ponto"></span>LABHUB</div>
+  <h1>Verificacao de geometria das transmissoes — tangentes externas</h1>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Parametros</h2>
+    <label for="tipo">Montagem</label>
+    <select id="tipo">
+      <option value="belt">Correia + Polias (trans_belt)</option>
+      <option value="chain">Corrente + Sprockets (trans_chain)</option>
+      <option value="gears">Par de Engrenagens (trans_gears)</option>
+      <option value="coupling">Acoplamento (trans_coupling)</option>
+    </select>
+
+    <label for="d1">Diametro da polia 1<span class="val" id="v_d1">60 mm</span></label>
+    <input type="range" id="d1" min="20" max="260" value="60">
+
+    <label for="d2">Diametro da polia 2<span class="val" id="v_d2">180 mm</span></label>
+    <input type="range" id="d2" min="20" max="260" value="180">
+
+    <label for="dist">Distancia entre centros<span class="val" id="v_dist">236 mm</span></label>
+    <input type="range" id="dist" min="80" max="340" value="236">
+
+    <label for="rpm">Rotacao do eixo<span class="val" id="v_rpm">1446 rpm</span></label>
+    <input type="range" id="rpm" min="0" max="1800" value="1446">
+
+    <div class="metricas" id="metricas"></div>
+
+    <p class="nota">
+      A correia/Corrente e desenhada seguindo as <b>tangentes externas reais</b> das duas polias.
+      A linha de tangencia encosta nas duas circunferencias ao mesmo tempo — a distancia do
+      centro de cada polia a reta e exatamente o raio da polia (0,00 mm de desvio).
+      Antes da correcao, os pontos de contato inferiores usavam <code>aTop &plusmn; &pi;</code>,
+      o que so coincide quando os raios sao iguais.
+    </p>
+    <div class="legenda">
+      <span><i style="background:#9AA5B5"></i>Polia 1 (motora)</span>
+      <span><i style="background:#5A6472"></i>Polia 2 (movida)</span>
+      <span><i style="background:#151A21;border:1px solid #4A5563"></i>Correia / corrente</span>
+      <span><i style="background:#3FB950"></i>Ponto de tangencia</span>
+      <span><i style="background:#E53935"></i>Centro</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Vista frontal (plano perpendicular ao eixo)</h2>
+    <canvas id="cena" width="900" height="560"></canvas>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var c = document.getElementById('cena');
+  var ctx = c.getContext('2d');
+  var el = function(id){ return document.getElementById(id); };
+  var estado = { tipo:'belt', d1:60, d2:180, dist:236, rpm:1446 };
+  var angulo = 0, ultimo = 0;
+
+  var COR = { p1:'#9AA5B5', p2:'#5A6472', cinta:'#151A21', tang:'#3FB950', centro:'#E53935', texto:'#D7DEE8', grade:'#1A212B' };
+
+  // ---- matematica identica a driveCurve() do SceneElements.tsx ----
+  function driveCurve(r1, r2, cx1, cx2){
+    var d = Math.max(0.02, cx2 - cx1);
+    var phi = Math.asin(Math.max(-1, Math.min(1, (r2 - r1) / d)));
+    var aTop = Math.atan2(Math.cos(phi), -Math.sin(phi));
+    var aBot = -aTop;
+    function Pt(cx, r, a){ return { x: cx + r*Math.cos(a), y: r*Math.sin(a) }; }
+    var pts = [];
+    function arc(cx, r, a0, a1, steps){
+      for (var i=0; i<=steps; i++){ var a = a0 + (a1-a0)*i/steps; pts.push(Pt(cx,r,a)); }
+    }
+    var t1 = Pt(cx1,r1,aTop), t2 = Pt(cx2,r2,aTop);
+    var b1 = Pt(cx1,r1,aBot), b2 = Pt(cx2,r2,aBot);
+    arc(cx1, r1, aTop, aBot + Math.PI*2, 12);
+    for (var j=1; j<4; j++) pts.push({ x: b1.x+(b2.x-b1.x)*j/4, y: b1.y+(b2.y-b1.y)*j/4 });
+    arc(cx2, r2, aBot, aTop, 12);
+    for (var k=1; k<4; k++) pts.push({ x: t2.x+(t1.x-t2.x)*k/4, y: t2.y+(t1.y-t2.y)*k/4 });
+    return { pts:pts, contatos:{ t1:t1, t2:t2, b1:b1, b2:b2 }, phi:phi, aTop:aTop, aBot:aBot };
+  }
+
+  // distancia do ponto a reta (para a metrica de tangencia)
+  function distReta(p, a, b){
+    var abx=b.x-a.x, aby=b.y-a.y, len=Math.hypot(abx,aby)||1e-9;
+    return Math.abs((p.x-a.x)*(-aby/len) + (p.y-a.y)*(abx/len));
+  }
+
+  function desenhar(){
+    var W = c.width, H = c.height;
+    ctx.clearRect(0,0,W,H);
+    // grade
+    ctx.strokeStyle = COR.grade; ctx.lineWidth = 1;
+    for (var gx=0; gx<W; gx+=45){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    for (var gy=0; gy<H; gy+=45){ ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+
+    var r1 = estado.d1/2000, r2 = estado.d2/2000;
+    var d  = estado.dist/1000;
+    var cx1 = -d/2, cx2 = d/2;
+    var esc = Math.min(W*0.40/Math.max(r1,r2), H*0.40/Math.max(r1,r2), 1150);
+    var cy = H/2 + 10;
+
+    function mx(x){ return W/2 + x*esc; }
+    function my(y){ return cy - y*esc; }
+
+    // ---- eixo (linha tracejada entre centros) ----
+    ctx.setLineDash([6,5]); ctx.strokeStyle='#39424F'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(mx(cx1)-r1*esc-40, cy); ctx.lineTo(mx(cx2)+r2*esc+40, cy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    var tipo = estado.tipo;
+
+    if (tipo === 'gears'){
+      // raios de primitivo pelo modulo, dentes defasados
+      var z1 = Math.round(estado.d1/12), z2 = Math.round(estado.d2/12);
+      var mod = Math.min(0.0045, 0.27/(z1+z2));
+      r1 = mod*z1/2; r2 = mod*z2/2;
+      cx1 = 0; cx2 = r1 + r2;
+      desenharEngrenagem(mx(cx1), cy, r1*esc, z1, COR.p1, 0);
+      var fase = Math.PI/Math.max(6, z2);
+      desenharEngrenagem(mx(cx2), cy, r2*esc, z2, COR.p2, fase);
+      // setas de rotacao opostas
+      setaRot(mx(cx1), cy, r1*esc+26,  angulo, COR.tang);
+      setaRot(mx(cx2), cy, r2*esc+26, -angulo*(r1/r2), COR.erro);
+      rotulo('Par de engrenagens ' + z1 + ':' + z2 + '  ·  1:' + (r2/r1).toFixed(2), W/2, 30);
+      rotulo('raio de primitivo m=' + (mod*1000).toFixed(2) + ' mm/z  ·  dentes defasados meio passo', W/2, 50);
+      return { r1:r1, r2:r2, cx1:cx1, cx2:cx2, d:d };
+    }
+
+    if (tipo === 'coupling'){
+      desenharAcoplamento(W/2, cy, esc);
+      rotulo('Acoplamento elastico  ·  relacao 1:1', W/2, 30);
+      rotulo('2 cubos + aranha de 3 garras + anel + 6 parafusos', W/2, 50);
+      return null;
+    }
+
+    var corrente = (tipo === 'chain');
+    var g = driveCurve(corrente ? r1-0.004 : r1+0.004, corrente ? r2-0.004 : r2+0.004, cx1, cx2);
+
+    // polias
+    desenharPolia(mx(cx1), cy, r1*esc, COR.p1, corrente);
+    desenharPolia(mx(cx2), cy, r2*esc, COR.p2, corrente);
+
+    // correia / corrente
+    ctx.beginPath();
+    ctx.moveTo(mx(g.pts[0].x), my(g.pts[0].y));
+    for (var i=1; i<g.pts.length; i++) ctx.lineTo(mx(g.pts[i].x), my(g.pts[i].y));
+    ctx.closePath();
+    ctx.fillStyle = corrente ? '#1A1E25' : COR.cinta;
+    ctx.fill();
+    ctx.strokeStyle = corrente ? '#2E3642' : '#3A4553';
+    ctx.lineWidth = corrente ? 1.5 : 2;
+    ctx.stroke();
+
+    // rolos da corrente
+    if (corrente){
+      for (var rc=0; rc<28; rc++){
+        var p = g.pts[Math.floor(rc*g.pts.length/28) % g.pts.length];
+        ctx.beginPath();
+        ctx.arc(mx(p.x), my(p.y), Math.max(2, 0.009*esc), 0, Math.PI*2);
+        ctx.fillStyle='#B0BAC8'; ctx.fill();
+      }
+    }
+
+    // pontos de tangencia + centros
+    ['t1','t2','b1','b2'].forEach(function(k){
+      var p = g.contatos[k];
+      ctx.beginPath(); ctx.arc(mx(p.x), my(p.y), 4.5, 0, Math.PI*2);
+      ctx.fillStyle = COR.tang; ctx.fill();
+      ctx.strokeStyle='#0B0E13'; ctx.lineWidth=1.5; ctx.stroke();
+    });
+    [[cx1,'A'],[cx2,'B']].forEach(function(par){
+      ctx.beginPath(); ctx.arc(mx(par[0]), cy, 4, 0, Math.PI*2);
+      ctx.fillStyle = COR.centro; ctx.fill();
+      ctx.fillStyle = COR.texto; ctx.font='12px ui-monospace,monospace';
+      ctx.fillText(par[1], mx(par[0])-3, cy-10);
+    });
+
+    // angulo da tangente
+    rotulo('inclinacao da tangente  phi = ' + (g.phi*180/Math.PI).toFixed(2) + ' graus', W/2, 30);
+    rotulo((corrente?'Corrente':'Correia') + ' ' + estado.d1 + 'x' + estado.d2 + ' mm  ·  centros ' + estado.dist + ' mm', W/2, 50);
+    return { r1:r1, r2:r2, cx1:cx1, cx2:cx2, d:d, contatos:g.contatos, phi:g.phi };
+  }
+
+  function desenharPolia(x, y, R, cor, corrente){
+    ctx.beginPath(); ctx.arc(x,y,R,0,Math.PI*2);
+    ctx.fillStyle = cor; ctx.fill();
+    ctx.strokeStyle='#0B0E13'; ctx.lineWidth=2; ctx.stroke();
+    // sulcos (V) ou dentes
+    var n = Math.max(8, Math.round(2*Math.PI*R/9));
+    ctx.strokeStyle = '#2E3642'; ctx.lineWidth = 1.6;
+    for (var i=0;i<n;i++){
+      var a = i/n*Math.PI*2;
+      ctx.beginPath();
+      ctx.arc(x, y, R*0.86, a-0.05, a+0.05);
+      ctx.stroke();
+    }
+    // cubo + furo
+    ctx.beginPath(); ctx.arc(x,y,R*0.3,0,Math.PI*2); ctx.fillStyle='#3A4553'; ctx.fill();
+    ctx.strokeStyle='#0B0E13'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x,y,Math.max(3,R*0.13),0,Math.PI*2); ctx.fillStyle='#0B0E13'; ctx.fill();
+    // rotacao
+    setaRot(x, y, R+18, angulo, COR.tang);
+  }
+
+  function desenharEngrenagem(x, y, R, z, cor, fase){
+    ctx.beginPath(); ctx.arc(x,y,R*0.88,0,Math.PI*2); ctx.fillStyle=cor; ctx.fill();
+    ctx.strokeStyle='#0B0E13'; ctx.lineWidth=2; ctx.stroke();
+    // dentes trapezoidais
+    var n = Math.max(6, Math.min(34, z));
+    ctx.fillStyle = cor;
+    for (var i=0;i<n;i++){
+      var a = fase + i/n*Math.PI*2;
+      var rm = (R*0.88 + R*1.07)/2, larg = (R*2*Math.PI)/n*0.5;
+      ctx.save(); ctx.translate(x,y); ctx.rotate(a);
+      ctx.fillRect(rm-R, -larg/2, R*1.19-R*0.88, larg);
+      ctx.restore();
+    }
+    // alma vazada + raios
+    ctx.beginPath(); ctx.arc(x,y,R*0.74,0,Math.PI*2); ctx.fillStyle='#2E3642'; ctx.fill();
+    ctx.strokeStyle=cor; ctx.lineWidth=Math.max(2,R*0.06);
+    for (var s=0;s<4;s++){
+      var sa = fase + s/4*Math.PI*2;
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(sa)*R*0.7, y+Math.sin(sa)*R*0.7); ctx.stroke();
+    }
+    // cubo + furo + chaveta
+    ctx.beginPath(); ctx.arc(x,y,Math.max(4,R*0.3),0,Math.PI*2); ctx.fillStyle='#3A4553'; ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,Math.max(2,R*0.13),0,Math.PI*2); ctx.fillStyle='#0B0E13'; ctx.fill();
+  }
+
+  function desenharAcoplamento(x, y, esc){
+    var comp = 0.20*esc, raio = 0.042*esc;
+    [-1,1].forEach(function(lado){
+      var cx = x + lado*0.06*esc;
+      ctx.beginPath(); ctx.arc(cx,y,raio,0,Math.PI*2); ctx.fillStyle='#8A94A6'; ctx.fill();
+      ctx.strokeStyle='#0B0E13'; ctx.lineWidth=2; ctx.stroke();
+      // parafusos
+      for (var i=0;i<3;i++){
+        var a = i/3*Math.PI*2 + Math.PI/6;
+        ctx.beginPath(); ctx.arc(cx+Math.cos(a)*raio*0.7, y+Math.sin(a)*raio*0.7, 3, 0, Math.PI*2);
+        ctx.fillStyle='#C7D0DA'; ctx.fill();
+      }
+    });
+    // garras
+    for (var g=0; g<3; g++){
+      var ag = g/3*Math.PI*2 + angulo;
+      ctx.fillStyle = '#C2543A';
+      ctx.fillRect(x - 0.013*esc, y - 0.05*esc, 0.026*esc, 0.10*esc);
+      ctx.save(); ctx.translate(x,y); ctx.rotate(ag);
+      ctx.fillRect(-0.013*esc, -0.05*esc, 0.026*esc, 0.10*esc);
+      ctx.restore();
+      void ag;
+    }
+    // eixo
+    ctx.fillStyle='#5A6472';
+    ctx.fillRect(x-comp/2, y-0.012*esc, comp, 0.024*esc);
+    setaRot(x, y, raio+22, angulo, COR.tang);
+  }
+
+  function setaRot(x, y, R, a, cor){
+    ctx.beginPath(); ctx.arc(x,y,R,a,a+Math.PI*1.5);
+    ctx.strokeStyle=cor; ctx.lineWidth=2; ctx.stroke();
+    var pa = a+Math.PI*1.5;
+    ctx.beginPath();
+    ctx.moveTo(x+Math.cos(pa)*R, y+Math.sin(pa)*R);
+    ctx.lineTo(x+Math.cos(pa-0.28)*R*0.86, y+Math.sin(pa-0.28)*R*0.86);
+    ctx.lineTo(x+Math.cos(pa+0.28)*R*0.86, y+Math.sin(pa+0.28)*R*0.86);
+    ctx.closePath(); ctx.fillStyle=cor; ctx.fill();
+  }
+
+  function rotulo(t, x, y){
+    ctx.fillStyle = COR.texto; ctx.font='13px "Segoe UI",system-ui,sans-serif';
+    ctx.textAlign='center'; ctx.fillText(t, x, y); ctx.textAlign='left';
+  }
+
+  function metricas(info){
+    var alvo = el('metricas');
+    if (!info){ alvo.innerHTML = '<div class="met"><b>1:1</b><span>acoplamento rigido</span></div>'; return; }
+    var razao = info.r2/info.r1;
+    var rpm2 = estado.rpm / razao;
+    var tang = 0, folga = 0;
+    if (info.contatos){
+      var A={x:info.cx1,y:0}, B={x:info.cx2,y:0};
+      var pares = [[info.contatos.b1, info.contatos.b2],[info.contatos.t1, info.contatos.t2]];
+      pares.forEach(function(par){
+        tang = Math.max(tang, Math.abs(distReta(A,par[0],par[1])-info.r1), Math.abs(distReta(B,par[0],par[1])-info.r2));
+        for (var k=1;k<=9;k++){
+          var m={x:par[0].x+(par[1].x-par[0].x)*k/10, y:par[0].y+(par[1].y-par[0].y)*k/10};
+          folga = Math.max(folga, Math.hypot(m.x-info.cx1,m.y)-info.r1, Math.hypot(m.x-info.cx2,m.y)-info.r2);
+        }
+      });
+    }
+    var vTang = tang < 1e-6 ? '<b class="ok">0,00 mm</b>' : '<b class="erro">'+(tang*1000).toFixed(2)+' mm</b>';
+    alvo.innerHTML =
+      '<div class="met">' + vTang + '<span>desvio da tangencia</span></div>' +
+      '<div class="met"><b>' + (folga*1000).toFixed(2) + ' mm</b><span>folga da correia</span></div>' +
+      '<div class="met"><b>1:' + razao.toFixed(2) + '</b><span>reducao</span></div>' +
+      '<div class="met"><b>' + Math.round(estado.rpm) + ' &rarr; ' + Math.round(rpm2) + '</b><span>rpm entrada &rarr; saida</span></div>';
+  }
+
+  function loop(t){
+    if (!ultimo) ultimo = t;
+    var dt = (t - ultimo)/1000; ultimo = t;
+    angulo += estado.rpm * Math.PI/30 * dt;
+    var info = desenhar();
+    metricas(info);
+    requestAnimationFrame(loop);
+  }
+
+  // ---- controles (todos funcionais) ----
+  function sinc(elId, chave, fmt){
+    el(elId).addEventListener('input', function(e){
+      estado[chave] = parseFloat(e.target.value);
+      el('v_'+chave).textContent = fmt(estado[chave]);
+    });
+    el('v_'+chave).textContent = fmt(estado[chave]);
+  }
+  sinc('d1','d1',function(v){return v+' mm';});
+  sinc('d2','d2',function(v){return v+' mm';});
+  sinc('dist','dist',function(v){return v+' mm';});
+  sinc('rpm','rpm',function(v){return v+' rpm';});
+  el('tipo').addEventListener('change', function(e){
+    estado.tipo = e.target.value;
+    // engrenagens usam diametro diferente: ajusta faixas
+    var z = estado.tipo === 'gears';
+    el('d1').min = z ? 60 : 20; el('d2').min = z ? 60 : 20;
+    el('d1').max = z ? 480 : 260; el('d2').max = z ? 480 : 260;
+  });
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

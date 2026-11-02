@@ -68,28 +68,76 @@ export const SceneCamera: React.FC = () => {
   return null
 }
 
-/** Controles configurados no gesto Factory I/O — usado dentro do <Canvas> */
+/**
+ * Controles configurados no gesto Factory I/O — usado dentro do <Canvas>.
+ *
+ * GESTOS (o mapeamento que o usuário precisa decorar):
+ *   ESQUERDO arrastado = mover a cena (PAN no plano do chão)
+ *   DIREITO  arrastado = girar a perspectiva (ÓRBITA)
+ *   MEIO     arrastado = zoom por arraste
+ *   roda do mouse      = zoom
+ *   W A S D / Q E      = mover a vista
+ *   F                  = enquadrar o selecionado · Home = tudo
+ *
+ * DECISÕES que tornam a navegação usável (eram a reclamação principal):
+ *  • SEM zoomToCursor: ele é instável no three.js atual e faz a vista
+ *    "saltar"/derivar sozinha quando a câmera tem amortecimento. O zoom
+ *    passa a ir ao alvo, que é previsível.
+ *  • screenSpacePanning = false: o pan desliza no PLANO DO CHÃO, não na
+ *    tela. Arrastar para o lado move a bancada para o lado — o que se espera.
+ *  • damping 0.16 (mais seco que 0.09): em máquina fraca o 0.09 deixava a
+ *    cena "derrapando" por segundos depois de soltar o botão.
+ *  • maxPolarAngle 1.48 (~85°): impede entrar por baixo do piso e o
+ *    usuário se perder no vazio.
+ *  • limites de distância e de alvo: a câmera nunca foge da bancada.
+ */
 export const FactoryControls: React.FC = () => (
   <OrbitControls
     makeDefault
     enableDamping
-    dampingFactor={0.09}
+    dampingFactor={0.16}
     /*
-      GESTOS Factory I/O (THREE.MOUSE: ROTATE=0, DOLLY=1, PAN=2):
-        ESQUERDO arrastado = mover a cena (PAN)
-        DIREITO  arrastado = girar a perspectiva (ROTATE)
-        MEIO     arrastado = zoom por arraste (DOLLY)
-      Clicar sem arrastar continua selecionando (a órbita só age com movimento).
+      THREE.MOUSE: ROTATE=0, DOLLY=1, PAN=2
+        ESQUERDO = PAN (2) · MEIO = DOLLY (1) · DIREITO = ROTATE (0)
     */
     mouseButtons={{ LEFT: 2, MIDDLE: 1, RIGHT: 0 }}
-    // zoom onde o cursor aponta — é o que faz o zoom "parar no lugar certo"
-    zoomToCursor
-    zoomSpeed={0.85}
-    panSpeed={0.95}
-    rotateSpeed={0.85}
-    // toque: 1 dedo move a cena, 2 dedos giram, pinch dá zoom
+    screenSpacePanning={false}
+    zoomSpeed={0.9}
+    panSpeed={1.0}
+    rotateSpeed={0.8}
+    // não deixa a vista virar por baixo do chão
+    minPolarAngle={0.05}
+    maxPolarAngle={1.48}
+    // mantém a distância útil numa bancada
+    minDistance={1.0}
+    maxDistance={38}
+    // toque: 1 dedo move a cena, 2 dedos giram
     touches={{ ONE: 2, TWO: 0 }}
   />
 )
+
+/**
+ * Trava de segurança da câmera: impede o alvo de escapar da bancada.
+ * Sem isso, um pan rápido pode mandar a vista para longe dos objetos e o
+ * usuário fica sem referência nenhuma do que está olhando.
+ */
+export const CameraGuard: React.FC = () => {
+  const controls = useThree(s => s.controls)
+
+  useFrame(() => {
+    const c = controls as any
+    if (!c || !c.target) return
+    const t = c.target
+    const LIM_X = 40, LIM_Z = 40, LIM_Y_MIN = -0.4, LIM_Y_MAX = 14
+    if (t.x < -LIM_X) t.x = -LIM_X
+    if (t.x > LIM_X) t.x = LIM_X
+    if (t.z < -LIM_Z) t.z = -LIM_Z
+    if (t.z > LIM_Z) t.z = LIM_Z
+    if (t.y < LIM_Y_MIN) t.y = LIM_Y_MIN
+    if (t.y > LIM_Y_MAX) t.y = LIM_Y_MAX
+  })
+
+  return null
+}
 
 export default SceneCamera

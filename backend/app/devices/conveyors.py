@@ -55,9 +55,13 @@ def create_conveyor_belt() -> Device:
         category=DeviceCategory.ACTUATOR,
         properties={
             # --- Escala em grade ---
-            "cells_x": 5,            # módulos no comprimento (ex: puxar p/ 52)
-            "cells_y": 1,            # módulos na largura (ex: puxar p/ 4)
-            "module_mm": 200,        # tamanho do módulo
+            # Padrão realista: 12 módulos de 250 mm = 3 m de comprimento por
+            # 0,5 m de largura. O antigo 5×200mm (1 m × 0,2 m) era do tamanho
+            # de uma bandeja, não de uma esteira industrial — aparecia menor
+            # que a engrenagem que a movia.
+            "cells_x": 12,           # módulos no comprimento (ex: puxar p/ 52)
+            "cells_y": 2,            # módulos na largura (ex: puxar p/ 4)
+            "module_mm": 250,        # tamanho do módulo
             # --- Acionamento ---
             "roller_diameter_mm": 80,
             "drive_mode": "auto",    # "auto" (eixo→senão comando) | "rpm" | "manual"
@@ -202,7 +206,7 @@ def create_roller_conveyor() -> Device:
         name="Esteira de Rolos",
         category=DeviceCategory.ACTUATOR,
         properties={
-            "cells_x": 6, "cells_y": 1, "module_mm": 250,
+            "cells_x": 12, "cells_y": 2, "module_mm": 250,
             "roller_diameter_mm": 50,
             "drive_mode": "rpm",
             "speed_m_s": 0.0,

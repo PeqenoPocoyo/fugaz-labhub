@@ -19,4 +19,17 @@ export default defineConfig({
       },
     },
   },
+  // O build de preview também precisa do proxy: o app chama /api/... por
+  // caminho absoluto, então abrir o dist/ por file:// não fala com o backend.
+  // Com o proxy aqui, `vite preview` serve o build E encaminha /api e /ws.
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': 'http://localhost:8000',
+      '/ws': {
+        target: 'ws://localhost:8000',
+        ws: true,
+      },
+    },
+  },
 })

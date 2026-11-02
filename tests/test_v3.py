@@ -84,7 +84,9 @@ def test_conveyor_scalable():
     """Esteira é escalável em células X×Y."""
     from app.devices.conveyors import create_conveyor_belt
     dev = create_conveyor_belt()
-    assert dev.properties["cells_x"] == 5
+    # padrão realista: 12 células × 250 mm = 3 m de comprimento
+    assert dev.properties["cells_x"] == 12
+    assert dev.properties["module_mm"] == 250
     dev.resize(52, 4)
     assert dev.properties["cells_x"] == 52
     assert dev.properties["cells_y"] == 4
@@ -111,7 +113,7 @@ def test_conveyor_speed_from_rpm():
     dev.update(1 / 60)
     assert dev.properties["shaft_rpm"] == pytest.approx(100, abs=0.5)
     assert dev.properties["speed_m_s"] == pytest.approx(0.5236, abs=0.002)
-    assert dev.properties["length_mm"] == 1000  # 5 células × 200mm
+    assert dev.properties["length_mm"] == 3000  # 12 células × 250mm = 3 m
 
 
 # ============================================================
