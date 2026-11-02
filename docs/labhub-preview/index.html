@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fugaz LABHUB ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Simulador Industrial</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+/* Preview standalone (file://): o app chama /api/... por caminho absoluto,
+   que nao resolve fora de um servidor. Redireciona para o backend real. */
+(function(){
+  var BASE = 'http://localhost:8000';
+  var origFetch = window.fetch ? window.fetch.bind(window) : null;
+  if (origFetch) {
+    window.fetch = function(input, init){
+      var url = (typeof input === 'string') ? input : (input && input.url) || '';
+      if (url.charAt(0) === '/' && url.indexOf('/api') === 0) {
+        input = BASE + url;
+      }
+      return origFetch(input, init);
+    };
+  }
+})();
+</script>
+<script type="module" crossorigin src="./assets/index-E6Dai_JM.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-C2bbl5b2.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
