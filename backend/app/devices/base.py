@@ -103,11 +103,12 @@ class Device:
         self.layer: str = "devices"
 
         # ---- Fixação e infraestrutura ----
-        from app.devices.fixation import fixations_for, shaft_fixations_for
-        self.fixations = fixations_for(type_id)        # pontos de montagem (base)
+        from app.devices.fixation import fixations_for, shaft_fixations_for, shafts_for
+        self.fixations = fixations_for(type_id)            # pontos de montagem (base)
         self.shaft_fixations = shaft_fixations_for(type_id)  # montagem por EIXO
-        self.slots: List[Any] = []                     # vagas (só infraestrutura)
-        self.conduit_path: Any = None                  # trajeto de duto/calha
+        self.shafts = shafts_for(type_id)                  # eixos físicos declarados
+        self.slots: List[Any] = []                         # vagas (só infraestrutura)
+        self.conduit_path: Any = None                      # trajeto de duto/calha
 
     def place(self, position: tuple):
         """
@@ -264,6 +265,7 @@ class Device:
             # Fixação / infraestrutura
             "fixations": [f.to_dict() for f in self.fixations],
             "shaft_fixations": [f.to_dict() for f in self.shaft_fixations],
+            "shafts": [s.to_dict() for s in self.shafts],
             "slots": [s.to_dict() for s in self.slots],
             "conduit_path": [list(p) for p in self.conduit_path] if self.conduit_path else None,
             # Âncora 3D de cada porta (offset local ao dispositivo)

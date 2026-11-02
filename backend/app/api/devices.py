@@ -269,24 +269,31 @@ async def snap_shaft(req: SnapShaftRequest):
         raise HTTPException(status_code=400,
                             detail=f"{trans.type_id} não tem fixação de eixo '{req.shaft_fixation_id}'")
 
-    # eixo do motor = direção do seu borne de saída (ou +X por padrão)
-    ancora = motor.port_anchors.get(req.motor_port)
-    if ancora:
-        # normal do eixo = para fora do motor, no plano do borne
-        eixo_dir = (1.0, 0.0, 0.0)
-    else:
-        eixo_dir = (1.0, 0.0, 0.0)
+    # eixo DECLARADO do motor (fonte da verdade, junto com o modelo 3D)
+    eixo = next(iter(motor.shafts), None)
+    if eixo is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{motor.type_id} nao tem eixo declarado para acoplar transmissao"
+        )
 
-    # posição do cubo = posição do eixo do motor (borne como referência)
-    hub_alvo = ancora or motor.transform.position
-    # desloca a transmissão para que o cubo encoste no eixo
-    gap = 0.06
+    hub_mundo = eixo.world_position(motor.transform.position)
+    eixo_dir = eixo.direction
+
+    # posição da transmissão: hub coincide com o eixo, com folga mínima
+    # para o cubo não atravessar a carcaça do motor
+    gap = 0.04
     novo = (
-        hub_alvo[0] - fix.local_offset[0] + eixo_dir[0] * gap,
-        hub_alvo[1] - fix.local_offset[1] + eixo_dir[1] * gap,
-        hub_alvo[2] - fix.local_offset[2] + eixo_dir[2] * gap,
+        hub_mundo[0] - fix.local_offset[0] + eixo_dir[0] * gap,
+        hub_mundo[1] - fix.local_offset[1] + eixo_dir[1] * gap,
+        hub_mundo[2] - fix.local_offset[2] + eixo_dir[2] * gap,
     )
     trans.place(novo)
+
+    # alinha a rotação da transmissão ao eixo do motor (mesmo yaw)
+    yaw_motor = motor.transform.rotation[0] if motor.transform.rotation else 0.0
+    trans.transform.rotation = (yaw_motor, 0.0, 0.0)
+
     world.version += 1
 
     await state.event_bus.emit("shaft_snapped", {

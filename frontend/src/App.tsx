@@ -375,6 +375,7 @@ const App: React.FC = () => {
           <Placement
             pendente={pendente}
             selecionado={selectedObj}
+            objetos={objects}
             slotsLivres={slots.filter(s => !s.occupied).map(s => ({ id: s.id, position: s.position }))}
             onSpawn={handleSpawnEm}
             onMover={handleMover}

@@ -17,11 +17,31 @@ import type { SceneObject } from '../../store/sceneStore'
 
 const ALTURA_CENA = 0.5  // altura do plano de referência do grid do backend
 
+/** tipos que acoplam por EIXO (precisam grudar no eixo de um motor) */
+const TRANSMISSOES = [
+  'trans_gears', 'trans_belt', 'trans_chain', 'trans_coupling',
+  'trans_screw', 'trans_linear_actuator',
+]
+
+/** rotaciona um ponto local (offset) pelo yaw em GRAUS do dispositivo */
+function rotacionar(local: [number, number, number], yawGraus: number): [number, number, number] {
+  const a = (yawGraus * Math.PI) / 180
+  const c = Math.cos(a), s = Math.sin(a)
+  return [local[0] * c + local[2] * s, local[1], -local[0] * s + local[2] * c]
+}
+
+/** direção de saída do eixo (sempre +X local, rotacionado pelo yaw) */
+function dirEixo(yawGraus: number): [number, number, number] {
+  return rotacionar([1, 0, 0], yawGraus)
+}
+
 interface PlacementProps {
   /** type_id sendo arrastado da árvore (null = nenhum) */
   pendente: string | null
   /** dispositivo selecionado na bancada */
   selecionado: SceneObject | null
+  /** todos os objetos da cena (para achar eixos de motores) */
+  objetos: Record<string, SceneObject>
   /** slots livres do mundo, para o snap magnético durante o arraste */
   slotsLivres: { id: string; position: [number, number, number] }[]
   onSpawn: (typeId: string, pos: [number, number, number], rotY: number) => void
@@ -64,7 +84,7 @@ const SetaDirecao: React.FC<{ rotY: number; cor?: string; escala?: number }> = (
 )
 
 export const Placement: React.FC<PlacementProps> = ({
-  pendente, selecionado, slotsLivres, onSpawn, onMover, onRot,
+  pendente, selecionado, objetos, slotsLivres, onSpawn, onMover, onRot,
 }) => {
   const camera = useThree(s => s.camera)
   const controls = useThree(s => s.controls)
@@ -72,7 +92,10 @@ export const Placement: React.FC<PlacementProps> = ({
 
   const [fantasmaPos, setFantasmaPos] = useState<[number, number, number]>([0, ALTURA_CENA, 0])
   const [fantasmaRot, setFantasmaRot] = useState(0)
+  const [giroFantasma, setGiroFantasma] = useState(0)
   const [snapAtivo, setSnapAtivo] = useState<[number, number, number] | null>(null)
+  // eixo de motor debaixo do fantasma de uma transmissão
+  const [eixoAlvo, setEixoAlvo] = useState<{ pos: [number, number, number]; yaw: number; motorId: string } | null>(null)
 
   // rotação do fantasma pelo teclado
   useEffect(() => {
@@ -92,8 +115,9 @@ export const Placement: React.FC<PlacementProps> = ({
 
   // reset do fantasma ao começar um novo arraste
   useEffect(() => {
-    if (pendente) setFantasmaRot(0)
+    if (pendente) { setFantasmaRot(0); setGiroFantasma(0) }
     setSnapAtivo(null)
+    setEixoAlvo(null)
   }, [pendente])
 
   // projeta o ponteiro no plano do chão
@@ -112,27 +136,80 @@ export const Placement: React.FC<PlacementProps> = ({
   }
 
   // acompanha o arraste da árvore (eventos nativos de drag&drop do DOM)
+  const ehTransmissao = !!pendente && TRANSMISSOES.includes(pendente)
+
+  /** procura o eixo de um motor mais próximo e devolve o ponto de acoplamento */
+  const acharEixo = (p: [number, number, number], raio = 0.5) => {
+    let melhor: { pos: [number, number, number]; yaw: number; motorId: string } | null = null
+    let menor = raio
+    for (const [id, o] of Object.entries(objetos)) {
+      const eixos = (o as any).shafts as any[] | undefined
+      if (!eixos || eixos.length === 0) continue
+      const yaw = (o.rotation?.[0] ?? 0)
+      for (const eixo of eixos) {
+        const local = (eixo.position || [0, 0, 0]) as [number, number, number]
+        const rot = rotacionar(local, yaw)
+        const mundo: [number, number, number] = [
+          o.position[0] + rot[0], o.position[1] + rot[1], o.position[2] + rot[2],
+        ]
+        const d = Math.hypot(mundo[0] - p[0], mundo[1] - p[1], mundo[2] - p[2])
+        if (d < menor) { menor = d; melhor = { pos: mundo, yaw, motorId: id } }
+      }
+    }
+    return melhor
+  }
+
   useEffect(() => {
     if (!pendente) return
     const onOver = (e: DragEvent) => {
       const p = paraChao(e.clientX, e.clientY)
-      if (p) {
-        setFantasmaPos(p)
-        // destaca furo livre próximo (pré-snap magnético)
-        const perto = slotsLivres.find(s => Math.hypot(s.position[0] - p[0], s.position[2] - p[2]) < 0.45)
-        setSnapAtivo(perto ? perto.position : null)
+      if (!p) return
+
+      // TRANSMISSÃO: grudar no eixo de um motor próximo
+      if (ehTransmissao) {
+        const eixo = acharEixo(p)
+        if (eixo) {
+          const dir = dirEixo(eixo.yaw)
+          const acoplado: [number, number, number] = [
+            eixo.pos[0] + dir[0] * 0.04,
+            eixo.pos[1] + dir[1] * 0.04,
+            eixo.pos[2] + dir[2] * 0.04,
+          ]
+          setFantasmaPos(acoplado)
+          setGiroFantasma((eixo.yaw * Math.PI) / 180)
+          setEixoAlvo(eixo)
+          return
+        }
+        setEixoAlvo(null)
       }
+
+      setFantasmaPos(p)
+      // destaca furo livre próximo (pré-snap magnético)
+      const perto = slotsLivres.find(s => Math.hypot(s.position[0] - p[0], s.position[2] - p[2]) < 0.45)
+      setSnapAtivo(perto ? perto.position : null)
     }
     const onDrop = (e: DragEvent) => {
       const p = paraChao(e.clientX, e.clientY)
-      const final = pertoSnap(p) || p
-      if (final) onSpawn(pendente, final, fantasmaRot)
-      setSnapAtivo(null)
-    }
-    const pertoSnap = (p: [number, number, number] | null) => {
-      if (!p) return null
+      if (!p) { setEixoAlvo(null); return }
+      // se é transmissão e há eixo por perto, acopla nele
+      if (ehTransmissao) {
+        const eixo = acharEixo(p)
+        if (eixo) {
+          const dir = dirEixo(eixo.yaw)
+          onSpawn(pendente, [
+            eixo.pos[0] + dir[0] * 0.04,
+            eixo.pos[1] + dir[1] * 0.04,
+            eixo.pos[2] + dir[2] * 0.04,
+          ], (eixo.yaw * Math.PI) / 180)
+          setEixoAlvo(null)
+          return
+        }
+      }
       const perto = slotsLivres.find(s => Math.hypot(s.position[0] - p[0], s.position[2] - p[2]) < 0.3)
-      return perto ? perto.position : null
+      const final = perto ? perto.position : p
+      onSpawn(pendente, final, fantasmaRot)
+      setSnapAtivo(null)
+      setEixoAlvo(null)
     }
     window.addEventListener('dragover', onOver)
     window.addEventListener('drop', onDrop)
@@ -140,7 +217,7 @@ export const Placement: React.FC<PlacementProps> = ({
       window.removeEventListener('dragover', onOver)
       window.removeEventListener('drop', onDrop)
     }
-  }, [pendente, fantasmaRot, slotsLivres, onSpawn])
+  }, [pendente, fantasmaRot, slotsLivres, onSpawn, ehTransmissao, objetos])
 
   const receita = useMemo(
     () => (pendente ? receitaPara(pendente, {}) : null),
@@ -238,17 +315,26 @@ export const Placement: React.FC<PlacementProps> = ({
     <group>
       {/* ---------- FANTASMA do que está sendo colocado ---------- */}
       {pendente && receita && (
-        <group position={fantasmaPos}>
+        <group position={fantasmaPos} rotation={[0, giroFantasma, 0]}>
           <group ref={grupoRef}>
             <ModeloReceita receita={receita} />
           </group>
           <GhostMaterial groupRef={grupoRef} />
-          <SetaDirecao rotY={fantasmaRot} />
+          <SetaDirecao rotY={giroFantasma} cor={eixoAlvo ? '#3FB950' : '#00B4D8'} />
           {/* anel de posição no chão */}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -ALTURA_CENA + 0.006, 0]}>
             <ringGeometry args={[0.30, 0.34, 28]} />
-            <meshBasicMaterial color="#00B4D8" transparent opacity={0.5} side={THREE.DoubleSide} />
+            <meshBasicMaterial color={eixoAlvo ? '#3FB950' : '#00B4D8'} transparent opacity={0.5} side={THREE.DoubleSide} />
           </mesh>
+          {/* eixo do motor debaixo do fantasma: anel + marcador */}
+          {eixoAlvo && (
+            <group position={[eixoAlvo.pos[0] - fantasmaPos[0], eixoAlvo.pos[1] - fantasmaPos[1], eixoAlvo.pos[2] - fantasmaPos[2]]}>
+              <mesh rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.055, 0.008, 6, 20]} />
+                <meshBasicMaterial color="#3FB950" />
+              </mesh>
+            </group>
+          )}
           {/* alvo de snap magnético quando há furo livre perto */}
           {snapAtivo && (
             <group position={[snapAtivo[0] - fantasmaPos[0], -ALTURA_CENA + 0.008, snapAtivo[2] - fantasmaPos[2]]}>

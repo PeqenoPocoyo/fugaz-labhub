@@ -283,6 +283,49 @@ SHAFT_FIXATIONS: Dict[str, List[FixationPoint]] = {
 }
 
 
+# ============================================================
+# EIXOS DECLARADOS (shafts) — onde o elementos de transmissão acoplam
+# ============================================================
+# Diferente das portas (elétricas/fluido) e das fixações (montagem em base):
+# o EIXO é o ponto físico por onde uma transmissão se acopla a um motor.
+# Declarado junto com o modelo, para o fantasma de posicionamento saber
+# exatamente onde "grudar".
+
+@dataclass
+class Shaft:
+    id: str
+    position: Vec3                     # posição LOCAL (relativa à origem do dono)
+    direction: Vec3 = (1.0, 0.0, 0.0)  # sentido de saída do eixo
+    radius: float = 0.014
+    label: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "position": self.position, "direction": self.direction,
+            "radius": self.radius, "label": self.label,
+        }
+
+    def world_position(self, device_pos: Vec3) -> Vec3:
+        return (
+            device_pos[0] + self.position[0],
+            device_pos[1] + self.position[1],
+            device_pos[2] + self.position[2],
+        )
+
+
+STANDARD_SHAFTS: Dict[str, List[Shaft]] = {
+    "motor_dc":      [Shaft("eixo", (0.44, 0, 0), (1, 0, 0), 0.014, "Eixo de saída")],
+    "motor_ac":      [Shaft("eixo", (0.46, 0, 0), (1, 0, 0), 0.016, "Eixo de saída")],
+    "motor_stepper": [Shaft("eixo", (0.26, 0, 0), (1, 0, 0), 0.012, "Eixo")],
+    "motor_servo":   [Shaft("eixo", (0.28, 0, 0), (1, 0, 0), 0.011, "Eixo")],
+}
+
+
+def shafts_for(type_id: str) -> List[Shaft]:
+    """Eixos declarados de um tipo de dispositivo."""
+    return list(STANDARD_SHAFTS.get(type_id, []))
+
+
 def fixations_for(type_id: str) -> List[FixationPoint]:
     """Retorna os pontos de fixação padrão de um tipo de dispositivo."""
     return list(STANDARD_FIXATIONS.get(type_id, []))

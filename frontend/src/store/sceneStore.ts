@@ -19,6 +19,7 @@ export interface SceneObject {
   type_id?: string
   ports?: Record<string, PortaObj>
   port_anchors?: Record<string, number[]>
+  shafts?: any[]
   position: [number, number, number]
   rotation: [number, number, number]
   scale: [number, number, number]

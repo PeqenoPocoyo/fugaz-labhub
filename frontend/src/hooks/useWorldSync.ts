@@ -16,6 +16,7 @@ interface WorldNode {
   conduit_path?: number[][] | null
   type_id?: string
   port_anchors?: Record<string, number[]>
+  shafts?: any[]
 }
 
 interface WorldConnection {
@@ -90,6 +91,7 @@ export const useWorldSync = (enabled = true, intervalMs = POLL_MS) => {
           category: n.category || 'other',
           ports: n.ports || {},
           port_anchors: n.port_anchors || {},
+          shafts: n.shafts || [],
         }
       }
 
