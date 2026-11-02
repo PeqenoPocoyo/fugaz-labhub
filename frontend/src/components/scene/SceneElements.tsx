@@ -152,30 +152,270 @@ export const RollerConveyorMesh: React.FC<{ obj: SceneObject }> = ({ obj }) => {
 /* ============================================================
    TRANSMISSÕES — engrenagens / correia / corrente / acoplamento / fuso / atuador
    ============================================================ */
-const Gear: React.FC<{ radius: number; teeth: number; rpm: number; color?: string }> = ({ radius, teeth, rpm, color = '#8A94A6' }) => {
-  const ref = useRef<any>(null)
-  useFrame((_, dt) => { if (ref.current) ref.current.rotation.z += THREE.MathUtils.degToRad(rpm) * dt })
+/** Engrenagem: coroa com dentes, alma vazada, cubo, furo e chaveta */
+const Gear: React.FC<{ radius: number; teeth: number; rpm: number; color?: string; width?: number; phase?: number }> =
+  ({ radius, teeth, rpm, color = '#9AA5B5', width, phase = 0 }) => {
+  const ref = useSpin(rpm, phase)
+  const w = width ?? Math.max(0.026, radius * 0.4)
+  const n = Math.max(6, Math.min(34, Math.round(teeth)))
+  const rRoot = radius * 0.88
+  const rTip = radius * 1.07
+  const hub = Math.max(0.02, radius * 0.3)
   return (
     <group ref={ref}>
       <mesh>
-        <cylinderGeometry args={[radius, radius, radius * 0.35, 16]} />
-        <meshStandardMaterial color={color} metalness={0.7} roughness={0.3} />
+        <cylinderGeometry args={[rRoot, rRoot, w, Math.max(12, n * 2)]} />
+        <meshStandardMaterial color={color} metalness={0.7} roughness={0.32} />
       </mesh>
-      {Array.from({ length: Math.min(16, teeth) }).map((_, i) => {
-        const a = (i / Math.min(16, teeth)) * Math.PI * 2
+      <mesh position={[0, 0, w * 0.34]}>
+        <cylinderGeometry args={[rRoot * 0.74, rRoot * 0.74, w * 0.5, 14]} />
+        <meshStandardMaterial color="#2E3642" metalness={0.45} roughness={0.55} />
+      </mesh>
+      {Array.from({ length: 4 }).map((_, i) => {
+        const a = (i / 4) * Math.PI * 2
         return (
-          <mesh key={i} position={[Math.cos(a) * radius, Math.sin(a) * radius, 0]}>
-            <boxGeometry args={[radius * 0.16, radius * 0.16, radius * 0.38]} />
-            <meshStandardMaterial color={color} metalness={0.7} roughness={0.3} />
+          <mesh key={`s${i}`} position={[Math.cos(a) * rRoot * 0.4, Math.sin(a) * rRoot * 0.4, w * 0.34]} rotation={[0, 0, a]}>
+            <boxGeometry args={[rRoot * 0.78, rRoot * 0.2, w * 0.5]} />
+            <meshStandardMaterial color={color} metalness={0.68} roughness={0.36} />
           </mesh>
         )
       })}
-      <mesh position={[0, 0, radius * 0.2]}>
-        <cylinderGeometry args={[radius * 0.22, radius * 0.22, 0.05, 10]} />
+      {Array.from({ length: n }).map((_, i) => {
+        const a = (i / n) * Math.PI * 2
+        return (
+          <mesh key={`t${i}`} position={[Math.cos(a) * (rRoot + rTip) / 2, Math.sin(a) * (rRoot + rTip) / 2, 0]} rotation={[0, 0, a]}>
+            <boxGeometry args={[rTip - rRoot, ((radius * 2 * Math.PI) / n) * 0.5, w]} />
+            <meshStandardMaterial color={color} metalness={0.7} roughness={0.28} />
+          </mesh>
+        )
+      })}
+      <mesh>
+        <cylinderGeometry args={[hub, hub, w * 2, 12]} />
+        <meshStandardMaterial color="#3A4553" metalness={0.75} roughness={0.3} />
+      </mesh>
+      <mesh>
+        <cylinderGeometry args={[hub * 0.45, hub * 0.45, w * 2.2, 10]} />
+        <meshStandardMaterial color="#0B0E13" />
+      </mesh>
+      <mesh position={[hub * 0.75, 0, w * 0.85]}>
+        <boxGeometry args={[0.008, 0.012, w * 0.4]} />
+        <meshStandardMaterial color="#C7D0DA" metalness={0.8} roughness={0.25} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Polia coroada com sulcos (correia em V) */
+const Pulley: React.FC<{ radius: number; rpm: number }> = ({ radius, rpm }) => {
+  const ref = useSpin(rpm)
+  return (
+    <group ref={ref}>
+      <mesh>
+        <cylinderGeometry args={[radius, radius, 0.05, 18]} />
+        <meshStandardMaterial color="#8A94A6" metalness={0.65} roughness={0.35} />
+      </mesh>
+      {[0.023, 0, -0.023].map((z, i) => (
+        <mesh key={i} position={[0, 0, z]}>
+          <torusGeometry args={[radius * 0.84, 0.005, 4, 18]} />
+          <meshStandardMaterial color="#2E3642" metalness={0.4} roughness={0.6} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0, 0.028]}>
+        <cylinderGeometry args={[radius * 1.06, radius * 1.06, 0.006, 18]} />
+        <meshStandardMaterial color="#B0BAC8" metalness={0.7} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 0, -0.028]}>
+        <cylinderGeometry args={[radius * 1.06, radius * 1.06, 0.006, 18]} />
+        <meshStandardMaterial color="#B0BAC8" metalness={0.7} roughness={0.3} />
+      </mesh>
+      <mesh>
+        <cylinderGeometry args={[0.026, 0.026, 0.1, 10]} />
+        <meshStandardMaterial color="#3A4553" metalness={0.75} roughness={0.3} />
+      </mesh>
+      <mesh>
+        <cylinderGeometry args={[0.011, 0.011, 0.12, 8]} />
         <meshStandardMaterial color="#0B0E13" />
       </mesh>
     </group>
   )
+}
+
+/** Roda dentada de corrente (sprocket) */
+const Sprocket: React.FC<{ radius: number; teeth: number; rpm: number }> = ({ radius, teeth, rpm }) => {
+  const ref = useSpin(rpm)
+  const n = Math.max(8, Math.min(30, Math.round(teeth)))
+  return (
+    <group ref={ref}>
+      <mesh>
+        <cylinderGeometry args={[radius * 0.9, radius * 0.9, 0.026, Math.max(12, n)]} />
+        <meshStandardMaterial color="#6B7787" metalness={0.7} roughness={0.3} />
+      </mesh>
+      {Array.from({ length: n }).map((_, i) => {
+        const a = (i / n) * Math.PI * 2
+        return (
+          <mesh key={i} position={[Math.cos(a) * radius, Math.sin(a) * radius, 0]} rotation={[0, 0, a]}>
+            <boxGeometry args={[radius * 0.18, ((radius * 2 * Math.PI) / n) * 0.45, 0.03]} />
+            <meshStandardMaterial color="#8A94A6" metalness={0.75} roughness={0.25} />
+          </mesh>
+        )
+      })}
+      <mesh>
+        <cylinderGeometry args={[0.03, 0.03, 0.052, 10]} />
+        <meshStandardMaterial color="#3A4553" metalness={0.75} roughness={0.3} />
+      </mesh>
+      <mesh>
+        <cylinderGeometry args={[0.012, 0.012, 0.062, 8]} />
+        <meshStandardMaterial color="#0B0E13" />
+      </mesh>
+    </group>
+  )
+}
+
+/** correia/corrente seguindo as tangentes entre as duas polias */
+const BeltLoop: React.FC<{ r1: number; r2: number; cx1: number; cx2: number; thickness?: number; color?: string }> =
+  ({ r1, r2, cx1, cx2, thickness = 0.006, color = '#151A21' }) => {
+  const curve = useMemo(
+    () => new THREE.CatmullRomCurve3(driveCurve(r1, r2, cx1, cx2), true, 'centripetal', 0.4),
+    [r1, r2, cx1, cx2]
+  )
+  return (
+    <mesh>
+      <tubeGeometry args={[curve, 60, thickness, 5, true]} />
+      <meshStandardMaterial color={color} roughness={0.9} metalness={0.1} />
+    </mesh>
+  )
+}
+
+/** rolos da corrente girando com a velocidade da corrente */
+const ChainRollers: React.FC<{ r1: number; r2: number; cx1: number; cx2: number; speed: number }> = ({ r1, r2, cx1, cx2, speed }) => {
+  const ref = useRef<any>(null)
+  const pts = useMemo(() => {
+    const c = new THREE.CatmullRomCurve3(driveCurve(r1, r2, cx1, cx2), true, 'centripetal', 0.4)
+    const out: THREE.Vector3[] = []
+    const total = 26
+    for (let i = 0; i < total; i++) out.push(c.getPoint(i / total))
+    return out
+  }, [r1, r2, cx1, cx2])
+  useFrame((_, dt) => {
+    if (ref.current) ref.current.children.forEach((r: any) => { r.rotation.z -= speed * dt })
+  })
+  return (
+    <group ref={ref}>
+      {pts.map((p, i) => (
+        <mesh key={i} position={[p.x, p.y, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.009, 0.009, 0.014, 6]} />
+          <meshStandardMaterial color="#B0BAC8" metalness={0.75} roughness={0.3} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/* ============ helpers de montagem (eixo ao longo de Z) ============ */
+
+/** eixo girando: rpm do backend -> rad/s na malha (preserva a fase inicial) */
+const useSpin = (rpm: number, phase = 0) => {
+  const ref = useRef<any>(null)
+  useFrame((_, dt) => { if (ref.current) ref.current.rotation.z = phase + ref.current.rotation.z + THREE.MathUtils.degToRad(rpm) * dt })
+  return ref
+}
+
+/** fuso / sem-fim: haste com filete aproximado por anéis em espiral */
+const ScrewRod: React.FC<{ len: number; r: number; rpm: number }> = ({ len, r, rpm }) => {
+  const ref = useSpin(rpm)
+  const rings = Math.max(6, Math.min(26, Math.round(len / 0.014)))
+  return (
+    <group ref={ref}>
+      <mesh>
+        <cylinderGeometry args={[r, r, len, 10]} />
+        <meshStandardMaterial color="#C7D0DA" metalness={0.85} roughness={0.2} />
+      </mesh>
+      {Array.from({ length: rings }).map((_, i) => {
+        const t = i / rings
+        const a = t * Math.PI * 4
+        return (
+          <mesh key={i} position={[Math.cos(a) * r * 1.05, Math.sin(a) * r * 1.05, -len / 2 + t * len]}>
+            <torusGeometry args={[r * 1.02, r * 0.2, 4, 8]} />
+            <meshStandardMaterial color="#9AA5B5" metalness={0.8} roughness={0.25} />
+          </mesh>
+        )
+      })}
+    </group>
+  )
+}
+
+/** coluna + mancal (castelo) apoiando um eixo na altura y */
+const Pedestal: React.FC<{ x: number; y: number; height: number; z?: number }> = ({ x, y, height, z = 0 }) => (
+  <group position={[x, y - height, z]}>
+    <mesh position={[0, height / 2, 0]}>
+      <boxGeometry args={[0.08, height, 0.11]} />
+      <meshStandardMaterial color="#39424F" metalness={0.6} roughness={0.42} />
+    </mesh>
+    <mesh position={[0, height + 0.012, 0]}>
+      <cylinderGeometry args={[0.034, 0.034, 0.05, 10]} />
+      <meshStandardMaterial color="#2E3642" metalness={0.5} roughness={0.5} />
+    </mesh>
+    <mesh position={[0, height + 0.038, 0]}>
+      <cylinderGeometry args={[0.016, 0.016, 0.03, 8]} />
+      <meshStandardMaterial color="#C7D0DA" metalness={0.8} roughness={0.25} />
+    </mesh>
+  </group>
+)
+
+/** placa de base com parafusos (vão ao longo de x ou z) */
+const Bedplate: React.FC<{ len: number; depth?: number; y?: number; along?: 'x' | 'z'; center?: number }> = ({ len, depth = 0.3, y = -0.14, along = 'x', center = 0 }) => (
+  <group position={along === 'x' ? [center, y, 0] : [0, y, center]}>
+    <mesh>
+      <boxGeometry args={along === 'x' ? [len, 0.016, depth] : [depth, 0.016, len]} />
+      <meshStandardMaterial color="#39424F" metalness={0.65} roughness={0.4} />
+    </mesh>
+    {[[-len / 2 + 0.035, -depth / 2 + 0.035], [len / 2 - 0.035, -depth / 2 + 0.035],
+      [-len / 2 + 0.035, depth / 2 - 0.035], [len / 2 - 0.035, depth / 2 - 0.035]].map(([a, b], i) => (
+      <mesh key={i} position={along === 'x' ? [a, 0.004, b] : [b, 0.004, a]}>
+        <cylinderGeometry args={[0.007, 0.007, 0.01, 6]} />
+        <meshStandardMaterial color="#8A94A6" metalness={0.7} roughness={0.3} />
+      </mesh>
+    ))}
+  </group>
+)
+
+/** ponta de eixo passante (saindo dos dois lados) */
+const ShaftStub: React.FC<{ len?: number }> = ({ len = 0.18 }) => (
+  <mesh>
+    <cylinderGeometry args={[0.013, 0.013, len, 10]} />
+    <meshStandardMaterial color="#C7D0DA" metalness={0.85} roughness={0.2} />
+  </mesh>
+)
+
+/** caminho fechado de correia/corrente em volta de duas polias (tangentes externas) */
+function driveCurve(r1: number, r2: number, cx1: number, cx2: number): THREE.Vector3[] {
+  const d = Math.max(0.02, cx2 - cx1)
+  const phi = Math.asin(Math.max(-1, Math.min(1, (r2 - r1) / d)))
+  // Normais das duas tangentes externas:
+  //   superior N_u = (-sen(phi),  cos(phi)) -> contato no angulo  aTop
+  //   inferior N_l = (-sen(phi), -cos(phi)) -> contato no angulo -aTop
+  // Em ambas dist(centro -> reta) = r da polia: a correia encosta sem cortar.
+  const aTop = Math.atan2(Math.cos(phi), -Math.sin(phi))
+  const aBot = -aTop
+  const Pt = (cx: number, r: number, a: number) => new THREE.Vector3(cx + r * Math.cos(a), r * Math.sin(a), 0)
+  const pts: THREE.Vector3[] = []
+  const arc = (cx: number, r: number, a0: number, a1: number, steps: number) => {
+    for (let i = 0; i <= steps; i++) {
+      const a = a0 + ((a1 - a0) * i) / steps
+      pts.push(Pt(cx, r, a))
+    }
+  }
+  const b1 = Pt(cx1, r1, aBot)
+  const b2 = Pt(cx2, r2, aBot)
+  const t1 = Pt(cx1, r1, aTop)
+  const t2 = Pt(cx2, r2, aTop)
+  // polia 1: contato superior -> inferior pelo lado OPOSTO a polia 2 (CCW)
+  arc(cx1, r1, aTop, aBot + Math.PI * 2, 12)
+  for (let i = 1; i < 4; i++) pts.push(b1.clone().lerp(b2, i / 4))
+  // polia 2: contato inferior -> superior passando por 0 (lado OPOSTO a polia 1)
+  arc(cx2, r2, aBot, aTop, 12)
+  for (let i = 1; i < 4; i++) pts.push(t2.clone().lerp(t1, i / 4))
+  return pts
 }
 
 export const TransmissionMesh: React.FC<{ obj: SceneObject }> = ({ obj }) => {
@@ -184,137 +424,244 @@ export const TransmissionMesh: React.FC<{ obj: SceneObject }> = ({ obj }) => {
   const ratio = num(prop(obj, 'ratio', 1), 1)
   const t = obj.type_id
   const [px, py, pz] = obj.position
+  // rotação gravada no backend em GRAUS, eixo da peça alinhado a +X
+  const rad: [number, number, number] = [
+    THREE.MathUtils.degToRad(obj.rotation?.[0] ?? 0),
+    THREE.MathUtils.degToRad(obj.rotation?.[1] ?? 0),
+    THREE.MathUtils.degToRad(obj.rotation?.[2] ?? 0),
+  ]
 
+  /* ---------- FUSO e ATUADOR LINEAR: motor + redutor + haste roscada ---------- */
   if (t === 'trans_screw' || t === 'trans_linear_actuator') {
     const stroke = num(prop(obj, 'stroke_mm', 300), 300) / 1000
     const posM = num(prop(obj, 'position_mm', 0), 0) / 1000
     const isActuator = t === 'trans_linear_actuator'
+    const bodyLen = isActuator ? 0.3 : 0.24
+    const rodLen = Math.max(0.08, Math.min(0.5, stroke))
+    const nutZ = posM * 0.8
     return (
-      <group position={[px, py, pz]}>
-        {/* Corpo */}
-        <mesh position={[0, 0, 0]}>
-          <cylinderGeometry args={[0.055, 0.055, isActuator ? 0.28 : 0.22, 12]} />
-          <meshStandardMaterial color="#5A6472" metalness={0.7} roughness={0.35} />
-        </mesh>
-        {/* Haste que avança */}
-        <mesh position={[0, posM + (isActuator ? 0.14 : 0.11), 0]}>
-          <cylinderGeometry args={[0.018, 0.018, 0.24, 8]} />
-          <meshStandardMaterial color="#C7D0DA" metalness={0.85} roughness={0.2} />
-        </mesh>
-        {/* Marca de fim de curso */}
-        <mesh position={[0, stroke + 0.25, 0]}>
-          <boxGeometry args={[0.05, 0.006, 0.05]} />
-          <meshStandardMaterial color="#E53935" />
-        </mesh>
-        <Text position={[0, -0.16, 0]} fontSize={0.12} color="#D7DEE8" anchorX="center" outlineWidth={0.006} outlineColor="#0B0E13">
-          {`${prop(obj, 'position_mm', 0)} mm`}
+      <group position={[px, py, pz]} rotation={rad}>
+        <group rotation={[0, Math.PI / 2, 0]}>
+          {/* motor traseiro */}
+          <mesh position={[0, 0, -bodyLen / 2 - 0.07]}>
+            <cylinderGeometry args={[0.055, 0.055, 0.16, 14]} />
+            <meshStandardMaterial color="#5A6472" metalness={0.7} roughness={0.35} />
+          </mesh>
+          {/* aletas de refrigeração */}
+          {Array.from({ length: 7 }).map((_, i) => (
+            <mesh key={i} position={[0, 0, -bodyLen / 2 - 0.15 + (i / 6) * 0.14]}>
+              <torusGeometry args={[0.058, 0.006, 4, 12]} />
+              <meshStandardMaterial color="#2E3642" metalness={0.6} roughness={0.45} />
+            </mesh>
+          ))}
+          {/* caixa / redutor */}
+          <mesh position={[0, 0, -0.04]}>
+            <cylinderGeometry args={[0.062, 0.062, bodyLen, 14]} />
+            <meshStandardMaterial color="#39424F" metalness={0.7} roughness={0.35} />
+          </mesh>
+          <mesh position={[0, 0, -0.04 + bodyLen / 2]}>
+            <cylinderGeometry args={[0.05, 0.05, 0.02, 14]} />
+            <meshStandardMaterial color="#242C36" metalness={0.6} roughness={0.4} />
+          </mesh>
+          {/* guia da haste (bucha) */}
+          <mesh position={[0, 0, 0.01]}>
+            <cylinderGeometry args={[0.03, 0.03, 0.05, 12]} />
+            <meshStandardMaterial color="#C7D0DA" metalness={0.8} roughness={0.25} />
+          </mesh>
+          {/* haste roscada girando */}
+          <group position={[0, 0, 0.02 + rodLen / 2]}>
+            <ScrewRod len={rodLen} r={0.013} rpm={rpmOut} />
+          </group>
+          {/* porca que avança + garra */}
+          <group position={[0, 0, 0.03 + nutZ]}>
+            <mesh>
+              <boxGeometry args={[0.05, 0.05, 0.035]} />
+              <meshStandardMaterial color="#B0BAC8" metalness={0.8} roughness={0.25} />
+            </mesh>
+            <mesh position={[0, 0.045, 0]}>
+              <boxGeometry args={[0.05, 0.03, 0.05]} />
+              <meshStandardMaterial color="#8A94A6" metalness={0.7} roughness={0.3} />
+            </mesh>
+          </group>
+          {/* fim de curso */}
+          <mesh position={[0, 0, 0.02 + rodLen + 0.02]}>
+            <cylinderGeometry args={[0.022, 0.022, 0.02, 10]} />
+            <meshStandardMaterial color="#C7D0DA" metalness={0.8} roughness={0.25} />
+          </mesh>
+          <mesh position={[0, 0.05, 0.02 + rodLen + 0.02]}>
+            <boxGeometry args={[0.03, 0.014, 0.014]} />
+            <meshStandardMaterial color="#E53935" />
+          </mesh>
+          {/* pés de fixação */}
+          {[-0.06, 0.06].map((z, i) => (
+            <mesh key={i} position={[0, -0.075, z]}>
+              <boxGeometry args={[0.13, 0.04, 0.05]} />
+              <meshStandardMaterial color="#39424F" metalness={0.6} roughness={0.45} />
+            </mesh>
+          ))}
+        </group>
+        <Text position={[0, 0.16, 0]} fontSize={0.1} color="#D7DEE8" anchorX="center" outlineWidth={0.005} outlineColor="#0B0E13">
+          {`${isActuator ? 'Atuador Linear' : 'Fuso'} · ${Math.round(posM * 1000)} mm / ${Math.round(stroke * 1000)} mm`}
         </Text>
       </group>
     )
   }
 
+  /* ---------- CORREIA + POLIAS ---------- */
   if (t === 'trans_belt') {
-    const rIn = num(prop(obj, 'pulley_d_in_mm', 60), 60) / 2000
-    const rOut = num(prop(obj, 'pulley_d_out_mm', 180), 180) / 2000
+    const dIn = num(prop(obj, 'pulley_d_in_mm', 60), 60)
+    const dOut = num(prop(obj, 'pulley_d_out_mm', 180), 180)
+    const rIn = dIn / 2000
+    const rOut = dOut / 2000
+    const half = (rIn + rOut) * 0.95
     return (
-      <group position={[px, py, pz]} rotation={[0, 0, Math.PI / 2]}>
-        <mesh position={[-0.12, 0, 0]}>
-          <cylinderGeometry args={[rIn, rIn, 0.05, 14]} />
-          <meshStandardMaterial color="#8A94A6" metalness={0.7} />
-        </mesh>
-        <mesh position={[0.12, 0, 0]}>
-          <cylinderGeometry args={[rOut, rOut, 0.05, 14]} />
-          <meshStandardMaterial color="#8A94A6" metalness={0.7} />
-        </mesh>
-        <Gear radius={rIn} teeth={8} rpm={rpmIn} />
-        <group position={[0.12, 0, 0]}>
-          <Spinner rpm={rpmOut} radius={rOut} teeth={14} />
+      <group position={[px, py, pz]} rotation={rad}>
+        <group rotation={[0, Math.PI / 2, 0]}>
+          <Bedplate len={half * 2 + rIn + rOut + 0.16} depth={0.3} y={-Math.max(rIn, rOut) - 0.06} />
+          <Pedestal x={-half} y={0} height={Math.max(0.06, rIn - 0.02)} />
+          <Pedestal x={half} y={0} height={Math.max(0.06, rOut - 0.02)} />
+          <group position={[-half, 0, 0]}>
+            <Pulley radius={rIn} rpm={rpmIn} />
+            <ShaftStub len={0.2} />
+          </group>
+          <group position={[half, 0, 0]}>
+            <Pulley radius={rOut} rpm={rpmOut} />
+            <ShaftStub len={0.2} />
+          </group>
+          {/* correia em V aberta seguindo as tangentes */}
+          <BeltLoop r1={rIn + 0.004} r2={rOut + 0.004} cx1={-half} cx2={half} />
+          {/* esticador */}
+          <group position={[0, rIn + rOut + 0.03, 0]}>
+            <Pulley radius={0.028} rpm={0} />
+          </group>
         </group>
-        {/* Correia */}
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.12, 0.008, 6, 24, Math.PI]} />
-          <meshStandardMaterial color="#1C222B" roughness={0.9} />
-        </mesh>
+        <Text position={[0, 0.24, 0]} fontSize={0.1} color="#D7DEE8" anchorX="center" outlineWidth={0.005} outlineColor="#0B0E13">
+          {`Correia+V ${dIn}/${dOut}mm · 1:${Number.isFinite(ratio) ? ratio.toFixed(2) : '?'}`}
+        </Text>
       </group>
     )
   }
 
+  /* ---------- CORRENTE + RODAS DENTADAS ---------- */
   if (t === 'trans_chain') {
+    const dIn = num(prop(obj, 'sprocket_d_in_mm', 80), 80)
+    const dOut = num(prop(obj, 'sprocket_d_out_mm', 240), 240)
+    const rIn = dIn / 2000
+    const rOut = dOut / 2000
+    const half = (rIn + rOut) * 0.98
+    const chainSpeed = Math.abs(rpmIn) * 2 * Math.PI * rIn / 60
     return (
-      <group position={[px, py, pz]} rotation={[0, 0, Math.PI / 2]}>
-        <mesh position={[-0.12, 0, 0]}>
-          <cylinderGeometry args={[0.06, 0.06, 0.04, 12]} />
-          <meshStandardMaterial color="#AB47BC" metalness={0.6} />
-        </mesh>
-        <mesh position={[0.12, 0, 0]}>
-          <cylinderGeometry args={[0.09, 0.09, 0.04, 12]} />
-          <meshStandardMaterial color="#AB47BC" metalness={0.6} />
-        </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.12, 0.006, 6, 24, Math.PI]} />
-          <meshStandardMaterial color="#212121" roughness={0.8} />
-        </mesh>
+      <group position={[px, py, pz]} rotation={rad}>
+        <group rotation={[0, Math.PI / 2, 0]}>
+          <Bedplate len={half * 2 + rIn + rOut + 0.16} depth={0.3} y={-Math.max(rIn, rOut) - 0.06} />
+          <Pedestal x={-half} y={0} height={Math.max(0.06, rIn - 0.02)} />
+          <Pedestal x={half} y={0} height={Math.max(0.06, rOut - 0.02)} />
+          <group position={[-half, 0, 0]}>
+            <Sprocket radius={rIn} teeth={Math.max(8, Math.round(dIn / 12))} rpm={rpmIn} />
+            <ShaftStub len={0.2} />
+          </group>
+          <group position={[half, 0, 0]}>
+            <Sprocket radius={rOut} teeth={Math.max(10, Math.round(dOut / 16))} rpm={rpmOut} />
+            <ShaftStub len={0.2} />
+          </group>
+          <BeltLoop r1={rIn - 0.004} r2={rOut - 0.004} cx1={-half} cx2={half} thickness={0.004} color="#1A1E25" />
+          <ChainRollers r1={rIn - 0.004} r2={rOut - 0.004} cx1={-half} cx2={half} speed={chainSpeed / 0.009} />
+          {/* tensor de corrente */}
+          <mesh position={[0, rIn + rOut + 0.02, 0]}>
+            <boxGeometry args={[0.03, 0.02, 0.09]} />
+            <meshStandardMaterial color="#6B7787" metalness={0.6} roughness={0.4} />
+          </mesh>
+        </group>
+        <Text position={[0, 0.24, 0]} fontSize={0.1} color="#D7DEE8" anchorX="center" outlineWidth={0.005} outlineColor="#0B0E13">
+          {`Corrente ${dIn}/${dOut}mm · 1:${Number.isFinite(ratio) ? ratio.toFixed(2) : '?'}`}
+        </Text>
       </group>
     )
   }
 
+  /* ---------- ACOPLAMENTO (cubo + aranha elástica) ---------- */
   if (t === 'trans_coupling') {
     return (
-      <group position={[px, py, pz]} rotation={[0, 0, Math.PI / 2]}>
-        <mesh position={[-0.07, 0, 0]}>
-          <cylinderGeometry args={[0.035, 0.035, 0.12, 12]} />
-          <meshStandardMaterial color="#8A94A6" metalness={0.8} />
-        </mesh>
-        <mesh position={[0.07, 0, 0]}>
-          <cylinderGeometry args={[0.035, 0.035, 0.12, 12]} />
-          <meshStandardMaterial color="#8A94A6" metalness={0.8} />
-        </mesh>
-        <mesh>
-          <cylinderGeometry args={[0.05, 0.05, 0.06, 12]} />
-          <meshStandardMaterial color="#E53935" roughness={0.7} />
-        </mesh>
+      <group position={[px, py, pz]} rotation={rad}>
+        <group rotation={[0, Math.PI / 2, 0]}>
+          {/* cubo esquerdo (lado motor) */}
+          <mesh position={[0, 0, -0.06]}>
+            <cylinderGeometry args={[0.042, 0.042, 0.1, 14]} />
+            <meshStandardMaterial color="#8A94A6" metalness={0.8} roughness={0.25} />
+          </mesh>
+          {/* cubo direito (lado carga) */}
+          <mesh position={[0, 0, 0.06]}>
+            <cylinderGeometry args={[0.042, 0.042, 0.1, 14]} />
+            <meshStandardMaterial color="#8A94A6" metalness={0.8} roughness={0.25} />
+          </mesh>
+          {/* garras de tração */}
+          {Array.from({ length: 3 }).map((_, i) => {
+            const a = (i / 3) * Math.PI * 2
+            return (
+              <mesh key={i} position={[Math.cos(a) * 0.028, Math.sin(a) * 0.028, 0]}>
+                <boxGeometry args={[0.026, 0.012, 0.09]} />
+                <meshStandardMaterial color="#C2543A" roughness={0.6} metalness={0.2} />
+              </mesh>
+            )
+          })}
+          {/* anel elástico */}
+          <mesh>
+            <torusGeometry args={[0.046, 0.008, 5, 20]} />
+            <meshStandardMaterial color="#E53935" roughness={0.7} />
+          </mesh>
+          {/* parafusos */}
+          {[-0.06, 0.06].map((z, k) =>
+            Array.from({ length: 3 }).map((_, i) => {
+              const a = (i / 3) * Math.PI * 2 + Math.PI / 6
+              return (
+                <mesh key={`${k}-${i}`} position={[Math.cos(a) * 0.03, Math.sin(a) * 0.03, z]}>
+                  <cylinderGeometry args={[0.006, 0.006, 0.014, 6]} />
+                  <meshStandardMaterial color="#C7D0DA" metalness={0.85} roughness={0.2} />
+                </mesh>
+              )
+            })
+          )}
+          {/* eixo passante */}
+          <mesh>
+            <cylinderGeometry args={[0.012, 0.012, 0.3, 10]} />
+            <meshStandardMaterial color="#5A6472" metalness={0.7} roughness={0.35} />
+          </mesh>
+        </group>
+        <Text position={[0, 0.13, 0]} fontSize={0.1} color="#D7DEE8" anchorX="center" outlineWidth={0.005} outlineColor="#0B0E13">
+          {`Acoplamento · 1:1`}
+        </Text>
       </group>
     )
   }
 
-  // Engrenagens (default)
+  /* ---------- PAR DE ENGRENAGENS (padrão) ---------- */
   const zIn = Math.max(6, Math.round(num(prop(obj, 'teeth_in', 18), 18)))
   const zOut = Math.max(6, Math.round(num(prop(obj, 'teeth_out', 54), 54)))
-  const rIn = 0.09
-  const rOut = Math.min(0.28, 0.09 * (zOut / Math.max(zIn, 1)) * 0.8 + 0.05)
+  // módulo derivado do número de dentes: raios proporcionais, malha real
+  const module = Math.min(0.0045, 0.27 / (zIn + zOut))
+  const rIn = (module * zIn) / 2
+  const rOut = (module * zOut) / 2
   const dist = rIn + rOut
+  const phaseB = Math.PI / Math.max(6, Math.min(34, zOut))
   return (
-    <group position={[px, py, pz]} rotation={[0, 0, Math.PI / 2]}>
-      <Gear radius={rIn} teeth={Math.min(12, zIn)} rpm={rpmIn} color="#9AA5B5" />
-      <group position={[dist, 0, 0]}>
-        <Gear radius={rOut} teeth={Math.min(16, zOut)} rpm={rpmOut} color="#5A6472" />
+    <group position={[px, py, pz]} rotation={rad}>
+      <group rotation={[0, Math.PI / 2, 0]}>
+        <Bedplate len={dist + rIn + rOut + 0.18} depth={0.34} y={-Math.max(rIn, rOut) - 0.05} />
+        <Pedestal x={0} y={0} height={Math.max(0.05, rIn - 0.02)} />
+        <Pedestal x={dist} y={0} height={Math.max(0.05, rOut - 0.02)} />
+        <Gear radius={rIn} teeth={zIn} rpm={rpmIn} color="#9AA5B5" />
+        <group position={[dist, 0, 0]}>
+          {/* engrenagens movidas giram ao contrário, dentes defasados */}
+          <Gear radius={rOut} teeth={zOut} rpm={-rpmOut} color="#5A6472" phase={phaseB} />
+        </group>
+        <ShaftStub len={0.22} />
+        <group position={[dist, 0, 0]}>
+          <ShaftStub len={0.22} />
+        </group>
       </group>
-      <Text position={[dist / 2, -0.2, 0]} fontSize={0.11} color="#FFCA28" anchorX="center" outlineWidth={0.006} outlineColor="#0B0E13">
-        {`1:${Number.isFinite(ratio) ? ratio.toFixed(1) : '?'}`}
+      <Text position={[0, 0.26, 0]} fontSize={0.1} color="#FFCA28" anchorX="center" outlineWidth={0.005} outlineColor="#0B0E13">
+        {`Engrenagens ${zIn}/${zOut} · 1:${Number.isFinite(ratio) ? ratio.toFixed(2) : '?'} · ${rpmIn | 0}→${rpmOut | 0} rpm`}
       </Text>
-    </group>
-  )
-}
-
-// Spinner auxiliar (roda girando isolada)
-const Spinner: React.FC<{ rpm: number; radius: number; teeth: number }> = ({ rpm, radius, teeth }) => {
-  const ref = useRef<any>(null)
-  useFrame((_, dt) => { if (ref.current) ref.current.rotation.z -= THREE.MathUtils.degToRad(rpm) * dt })
-  return (
-    <group ref={ref}>
-      <mesh>
-        <cylinderGeometry args={[radius, radius, 0.05, 14]} />
-        <meshStandardMaterial color="#8A94A6" metalness={0.7} />
-      </mesh>
-      {Array.from({ length: Math.min(16, teeth) }).map((_, i) => {
-        const a = (i / Math.min(16, teeth)) * Math.PI * 2
-        return (
-          <mesh key={i} position={[Math.cos(a) * radius, Math.sin(a) * radius, 0]}>
-            <boxGeometry args={[radius * 0.14, radius * 0.14, 0.055]} />
-            <meshStandardMaterial color="#8A94A6" metalness={0.7} />
-          </mesh>
-        )
-      })}
     </group>
   )
 }
